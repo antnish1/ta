@@ -30,8 +30,9 @@
   <table id="resultTable" hidden>
     <thead>
       <tr>
-        <th>S.No.</th><th>Date</th><th>Name</th><th>Branch</th><th>Target Place</th>
-        <th>Total KM</th><th>Amt. Requested</th><th>Amt. Passed</th><th>Machine Status</th><th>Machine No.</th>
+        <th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+        <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+        <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
       </tr>
     </thead>
     <tbody></tbody>
@@ -41,7 +42,7 @@
   <script>
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
 
-    const REQUIRED_HEADERS = ['S.No.', 'Date', 'Name', 'Branch', 'Target Place', 'Total KM', 'Amt. Requested', 'Amt. Passed', 'Machine Status', 'Machine No.'];
+    const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
     const machineInput = document.getElementById('machineNo');
     const searchBtn = document.getElementById('searchBtn');
     const downloadBtn = document.getElementById('downloadBtn');
@@ -88,16 +89,19 @@
       const dataRows = rows2d.slice(headerIndex + 1).filter(r => r.some(v => String(v).trim() !== ''));
 
       return dataRows.map(r => ({
-        'S.No.': pick(r, headerMap, ['S.No.', 'S No', 'Serial No']),
-        'Date': pick(r, headerMap, ['Date']),
-        'Name': pick(r, headerMap, ['Name']),
-        'Branch': pick(r, headerMap, ['Branch']),
-        'Target Place': pick(r, headerMap, ['Target Place']),
-        'Total KM': pick(r, headerMap, ['Total KM', 'Total K M']),
-        'Amt. Requested': pick(r, headerMap, ['Amt. Requested', 'Amt Requested']),
-        'Amt. Passed': pick(r, headerMap, ['Amt. Passed', 'Amt Passed']),
-        'Machine Status': pick(r, headerMap, ['Machine Status']),
-        'Machine No.': pick(r, headerMap, ['Machine No.', 'Machine No', 'Machine Number'])
+        'DATE': pick(r, headerMap, ['Date', 'DATE']),
+        'Location': pick(r, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+        'Engineer Name': pick(r, headerMap, ['Engineer Name', 'Name']),
+        'Workshop/Onsite': pick(r, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
+        'Call Type': pick(r, headerMap, ['Call Type', 'Type of Call']),
+        'primary / secondary Engineer': pick(r, headerMap, ['primary / secondary Engineer', 'Primary Engineer', 'Secondary Engineer']),
+        'Camplaint': pick(r, headerMap, ['Camplaint', 'Complaint']),
+        'Customer Name': pick(r, headerMap, ['Customer Name', 'Customer']),
+        'Machine No.': pick(r, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
+        'HMR': pick(r, headerMap, ['HMR']),
+        'Brekdown status': pick(r, headerMap, ['Brekdown status', 'Breakdown status', 'Machine Status']),
+        "Site's Location": pick(r, headerMap, ["Site's Location", 'Site Location', 'Location']),
+        'call id': pick(r, headerMap, ['call id', 'Call ID'])
       }));
     }
 
