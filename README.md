@@ -2,16 +2,19 @@
 
 Simple web page that:
 - loads data from your Google Sheet (`Sheet1` / `gid=0`),
-- filters rows by **exact Machine No.**,
-- shows matching rows on screen,
-- exports selected rows to a new Excel file.
+- filters rows by exact `Machine No.`,
+- lets you create progressive list IDs and save selected rows,
+- loads selected rows by list ID,
+- exports a selected list to Excel.
 
 ## Run
-
 Open `index.html` in a browser.
 
-## Notes
+## Google Sheet "Selected Rows" sync
+To save/load selected rows in a Google Sheet tab for all users, set an **Apps Script Web App URL** in the page.
 
-- Make sure the Google Sheet is shared so it can be read from the browser.
-- The page title is dynamic and uses today's date.
-- To search again, enter a different Machine No. and click **Search**.
+Expected Apps Script API:
+- `POST ?` body: `{ "action": "appendSelectedRows", "rows": [...] }`
+- `GET ?action=getList&listId=<id>` returns: `{ "rows": [...] }`
+
+If URL is not set (or fails), app uses local browser storage fallback.

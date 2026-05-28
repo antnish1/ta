@@ -28,6 +28,12 @@
     <span id="currentListInfo" class="muted">No active list yet.</span>
   </div>
 
+  <div class="row">
+    <label for="scriptUrl"><strong>Google Sheet Save URL (Apps Script Web App):</strong></label><br />
+    <input id="scriptUrl" type="text" placeholder="Paste Apps Script Web App URL" style="width: 520px;" />
+    <button id="saveScriptUrlBtn">Save URL</button>
+  </div>
+
   <div class="tab-buttons">
     <button id="searchTabBtn">Search</button>
     <button id="selectedTabBtn">Selected Rows</button>
@@ -44,14 +50,7 @@
     <div id="status" class="muted"></div>
 
     <table id="resultTable" hidden>
-      <thead>
-        <tr>
-          <th>Select</th>
-          <th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
-          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
-          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
-        </tr>
-      </thead>
+      <thead><tr><th>Select</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th><th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th><th>Brekdown status</th><th>Site's Location</th><th>call id</th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
@@ -67,14 +66,7 @@
     <div id="downloadStatus" class="muted"></div>
 
     <table id="selectedTable" hidden>
-      <thead>
-        <tr>
-          <th>List No.</th>
-          <th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
-          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
-          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
-        </tr>
-      </thead>
+      <thead><tr><th>List No.</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th><th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th><th>Brekdown status</th><th>Site's Location</th><th>call id</th></tr></thead>
       <tbody></tbody>
     </table>
   </section>
@@ -84,200 +76,71 @@
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
     const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
 
-    const titleEl = document.getElementById('title');
-    const currentListInfo = document.getElementById('currentListInfo');
-    const createListBtn = document.getElementById('createListBtn');
+    const titleEl = document.getElementById('title'); const currentListInfo = document.getElementById('currentListInfo');
+    const createListBtn = document.getElementById('createListBtn'); const scriptUrlInput = document.getElementById('scriptUrl'); const saveScriptUrlBtn = document.getElementById('saveScriptUrlBtn');
+    const machineInput = document.getElementById('machineNo'); const searchBtn = document.getElementById('searchBtn'); const addSelectedBtn = document.getElementById('addSelectedBtn');
+    const statusEl = document.getElementById('status'); const resultTable = document.getElementById('resultTable'); const resultTbody = resultTable.querySelector('tbody');
+    const searchTabBtn = document.getElementById('searchTabBtn'); const selectedTabBtn = document.getElementById('selectedTabBtn'); const searchTab = document.getElementById('searchTab'); const selectedTab = document.getElementById('selectedTab');
+    const selectedTable = document.getElementById('selectedTable'); const selectedTbody = selectedTable.querySelector('tbody');
+    const listStatus = document.getElementById('listStatus'); const downloadStatus = document.getElementById('downloadStatus');
+    const downloadListIdInput = document.getElementById('downloadListId'); const loadListBtn = document.getElementById('loadListBtn'); const downloadBtn = document.getElementById('downloadBtn');
 
-    const machineInput = document.getElementById('machineNo');
-    const searchBtn = document.getElementById('searchBtn');
-    const addSelectedBtn = document.getElementById('addSelectedBtn');
-    const statusEl = document.getElementById('status');
-    const resultTable = document.getElementById('resultTable');
-    const resultTbody = resultTable.querySelector('tbody');
+    let lastSearchRows = [], loadedListRows = [], currentListId = null;
 
-    const searchTabBtn = document.getElementById('searchTabBtn');
-    const selectedTabBtn = document.getElementById('selectedTabBtn');
-    const searchTab = document.getElementById('searchTab');
-    const selectedTab = document.getElementById('selectedTab');
+    const getListsState = () => JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{}}');
+    const setListsState = s => localStorage.setItem('machineListsState', JSON.stringify(s));
+    const getScriptUrl = () => localStorage.getItem('selectedRowsScriptUrl') || '';
+    const setScriptUrl = url => localStorage.setItem('selectedRowsScriptUrl', url);
 
-    const selectedTable = document.getElementById('selectedTable');
-    const selectedTbody = selectedTable.querySelector('tbody');
-    const listStatus = document.getElementById('listStatus');
-    const downloadStatus = document.getElementById('downloadStatus');
-    const downloadListIdInput = document.getElementById('downloadListId');
-    const loadListBtn = document.getElementById('loadListBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
+    const cleanHeader = v => String(v ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    const findHeaderRowIndex = rows2d => rows2d.findIndex(r => r.some(c => cleanHeader(c).includes('machine no')));
+    const mapHeadersToIndex = row => { const m={}; row.forEach((h,i)=>{const k=cleanHeader(h); if(k) m[k]=i;}); return m; };
+    const pick = (row, map, aliases) => { for (const a of aliases) { const i = map[cleanHeader(a)]; if (i !== undefined) return row[i] ?? ''; } return ''; };
+    function formatDateValue(value){ if(value==null) return ''; const t=String(value).trim(); if(!t) return ''; const n=Number(t); if(!Number.isNaN(n)&&/^\d+(\.\d+)?$/.test(t)){const p=XLSX.SSF.parse_date_code(n); if(p) return `${String(p.d).padStart(2,'0')}/${String(p.m).padStart(2,'0')}/${p.y}`;} const parts=t.split(/[\/-]/).map(v=>v.trim()); if(parts.length===3&&parts[2].length===4) return `${parts[0].padStart(2,'0')}/${parts[1].padStart(2,'0')}/${parts[2]}`; const d=new Date(t); if(!Number.isNaN(d.getTime())) return `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`; return t; }
+    function getTodayTitle(){const d=new Date(); return `Engineer Tour Bill Date ${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;}
 
-    let lastSearchRows = [];
-    let loadedListRows = [];
-    let currentListId = null;
+    function parseRows(csvText){ const wb=XLSX.read(csvText,{type:'string'}); const ws=wb.Sheets[wb.SheetNames[0]]; const rows2d=XLSX.utils.sheet_to_json(ws,{header:1,defval:''}); const hi=findHeaderRowIndex(rows2d); if(hi===-1) throw new Error('Header row not found in sheet.'); const hm=mapHeadersToIndex(rows2d[hi]); const rows=rows2d.slice(hi+1).filter(r=>r.some(v=>String(v).trim()!=='')); return rows.map(r=>({'DATE':formatDateValue(pick(r,hm,['Date','DATE'])),'Location':pick(r,hm,['Location','Branch',"Site's Location",'Target Place']),'Engineer Name':pick(r,hm,['Engineer Name','Name']),'Workshop/Onsite':pick(r,hm,['Workshop/Onsite','Workshop Onsite','Workshop','Onsite']),'Call Type':pick(r,hm,['Call Type','Type of Call']),'primary / secondary Engineer':pick(r,hm,['primary / secondary Engineer','Primary Engineer','Secondary Engineer']),'Camplaint':pick(r,hm,['Camplaint','Complaint']),'Customer Name':pick(r,hm,['Customer Name','Customer']),'Machine No.':pick(r,hm,['Machine No.','Machine No','Machine Number']),'HMR':pick(r,hm,['HMR']),'Brekdown status':pick(r,hm,['Brekdown status','Breakdown status','Machine Status']),"Site's Location":pick(r,hm,["Site's Location",'Site Location','Location']),'call id':pick(r,hm,['call id','Call ID'])})); }
 
-    function getTodayTitle() {
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-      return `Engineer Tour Bill Date ${dd}-${mm}-${yyyy}`;
+    async function syncRowsToGoogleSheet(rows){
+      const scriptUrl = getScriptUrl();
+      if (!scriptUrl) return false;
+      const res = await fetch(scriptUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: 'appendSelectedRows', rows }) });
+      if (!res.ok) throw new Error('Could not save to Google Sheet script URL.');
+      return true;
     }
 
-    function cleanHeader(value) {
-      return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    async function loadListFromGoogleSheet(listId){
+      const scriptUrl = getScriptUrl();
+      if (!scriptUrl) return null;
+      const res = await fetch(`${scriptUrl}?action=getList&listId=${encodeURIComponent(listId)}`);
+      if (!res.ok) throw new Error('Could not load list from Google Sheet script URL.');
+      const data = await res.json();
+      return Array.isArray(data.rows) ? data.rows : [];
     }
 
-    function formatDateValue(value) {
-      if (value === null || value === undefined) return '';
-      const text = String(value).trim();
-      if (!text) return '';
-      const numeric = Number(text);
-      if (!Number.isNaN(numeric) && /^\d+(\.\d+)?$/.test(text)) {
-        const parsed = XLSX.SSF.parse_date_code(numeric);
-        if (parsed) return `${String(parsed.d).padStart(2, '0')}/${String(parsed.m).padStart(2, '0')}/${parsed.y}`;
-      }
-      const parts = text.split(/[\/-]/).map(v => v.trim());
-      if (parts.length === 3 && parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
-      const jsDate = new Date(text);
-      if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
-      return text;
+    function createNewList(){ const st=getListsState(); const id=st.nextListId; st.nextListId+=1; st.lists[id]=st.lists[id]||[]; setListsState(st); currentListId=id; currentListInfo.textContent=`Current List No: ${id}`; listStatus.textContent=`Created List No. ${id}.`; }
+
+    async function searchRows(){ const m=machineInput.value.trim(); if(!m){statusEl.textContent='Please enter a machine number.'; return;} statusEl.textContent='Loading data from Google Sheet...'; resultTbody.innerHTML=''; resultTable.hidden=true; addSelectedBtn.disabled=true; lastSearchRows=[]; try{const res=await fetch(SHEET_CSV_URL); if(!res.ok) throw new Error('Could not fetch Google Sheet. Ensure it is shared publicly/viewable.'); const filtered=parseRows(await res.text()).filter(r=>String(r['Machine No.']).trim()===m); lastSearchRows=filtered; if(!filtered.length){statusEl.textContent=`No rows found for Machine No. "${m}".`; return;} filtered.forEach((row,idx)=>{const tr=document.createElement('tr'); const td=document.createElement('td'); const cb=document.createElement('input'); cb.type='checkbox'; cb.dataset.rowIndex=idx; td.appendChild(cb); tr.appendChild(td); REQUIRED_HEADERS.forEach(h=>{const x=document.createElement('td'); x.textContent=row[h]??''; tr.appendChild(x);}); resultTbody.appendChild(tr);}); resultTable.hidden=false; addSelectedBtn.disabled=false; statusEl.textContent=`${filtered.length} row(s) found for Machine No. "${m}".`;}catch(err){statusEl.textContent=`Error: ${err.message}`;}}
+
+    async function addSelectedToCurrentList(){ if(!currentListId){statusEl.textContent='Create a new list first.'; return;} const checks=resultTbody.querySelectorAll('input[type="checkbox"]:checked'); if(!checks.length){statusEl.textContent='Select at least one row.'; return;} const st=getListsState(); const target=st.lists[currentListId]||[]; const added=[]; checks.forEach(cb=>{const row=lastSearchRows[Number(cb.dataset.rowIndex)]; if(row){const withList={ 'List No.': currentListId, ...row }; target.push(withList); added.push(withList);}}); st.lists[currentListId]=target; setListsState(st);
+      try { const synced = await syncRowsToGoogleSheet(added); statusEl.textContent = `${added.length} row(s) added to List No. ${currentListId}.${synced ? ' Synced to Google Sheet.' : ' Saved locally (set script URL to sync online).'}`; }
+      catch (err) { statusEl.textContent = `${added.length} row(s) added locally to List No. ${currentListId}. Google Sheet sync failed: ${err.message}`; }
     }
 
-    function findHeaderRowIndex(rows2d) { return rows2d.findIndex(row => row.some(cell => cleanHeader(cell).includes('machine no'))); }
-    function mapHeadersToIndex(headerRow) { const m={}; headerRow.forEach((h,i)=>{const k=cleanHeader(h); if(k) m[k]=i;}); return m; }
-    function pick(row, headerMap, aliases) { for (const alias of aliases) { const i=headerMap[cleanHeader(alias)]; if (i !== undefined) return row[i] ?? ''; } return ''; }
+    function renderSelectedRows(rows, id){ selectedTbody.innerHTML=''; selectedTable.hidden=true; downloadBtn.disabled=true; loadedListRows=[]; if(!rows.length){ listStatus.textContent=`No saved rows found for List No. ${id}.`; return; } rows.forEach(row=>{const tr=document.createElement('tr'); const td=document.createElement('td'); td.textContent=row['List No.']; tr.appendChild(td); REQUIRED_HEADERS.forEach(h=>{const x=document.createElement('td'); x.textContent=row[h]??''; tr.appendChild(x);}); selectedTbody.appendChild(tr);}); loadedListRows=rows; selectedTable.hidden=false; downloadBtn.disabled=false; listStatus.textContent=`Loaded ${rows.length} row(s) for List No. ${id}.`; }
 
-    function parseRows(csvText) {
-      const wb = XLSX.read(csvText, { type: 'string' });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows2d = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
-      const headerIndex = findHeaderRowIndex(rows2d);
-      if (headerIndex === -1) throw new Error('Header row not found in sheet.');
-      const headerMap = mapHeadersToIndex(rows2d[headerIndex]);
-      const dataRows = rows2d.slice(headerIndex + 1).filter(r => r.some(v => String(v).trim() !== ''));
-      return dataRows.map(r => ({
-        'DATE': formatDateValue(pick(r, headerMap, ['Date', 'DATE'])),
-        'Location': pick(r, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
-        'Engineer Name': pick(r, headerMap, ['Engineer Name', 'Name']),
-        'Workshop/Onsite': pick(r, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
-        'Call Type': pick(r, headerMap, ['Call Type', 'Type of Call']),
-        'primary / secondary Engineer': pick(r, headerMap, ['primary / secondary Engineer', 'Primary Engineer', 'Secondary Engineer']),
-        'Camplaint': pick(r, headerMap, ['Camplaint', 'Complaint']),
-        'Customer Name': pick(r, headerMap, ['Customer Name', 'Customer']),
-        'Machine No.': pick(r, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
-        'HMR': pick(r, headerMap, ['HMR']),
-        'Brekdown status': pick(r, headerMap, ['Brekdown status', 'Breakdown status', 'Machine Status']),
-        "Site's Location": pick(r, headerMap, ["Site's Location", 'Site Location', 'Location']),
-        'call id': pick(r, headerMap, ['call id', 'Call ID'])
-      }));
+    async function loadList(){ const id=Number(downloadListIdInput.value); if(!id||id<1){listStatus.textContent='Enter a valid List ID (1 or greater).'; return;} try { const remoteRows = await loadListFromGoogleSheet(id); if (remoteRows) { renderSelectedRows(remoteRows, id); downloadStatus.textContent='Loaded from Google Sheet.'; return; } } catch (err) { downloadStatus.textContent = `Google Sheet load failed, using local data: ${err.message}`; }
+      const local=getListsState().lists[id]||[]; renderSelectedRows(local, id);
     }
 
-    function getListsState() {
-      return JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{}}');
-    }
-    function setListsState(state) { localStorage.setItem('machineListsState', JSON.stringify(state)); }
+    function downloadList(){ if(!loadedListRows.length) return; const headers=['List No.',...REQUIRED_HEADERS]; const ws=XLSX.utils.json_to_sheet(loadedListRows,{header:headers}); const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,'SelectedRows'); const id=loadedListRows[0]['List No.']; XLSX.writeFile(wb,`selected_list_${id}.xlsx`); downloadStatus.textContent=`Downloaded List No. ${id}.`; }
+    function showTab(w){ searchTab.classList.toggle('active', w==='search'); selectedTab.classList.toggle('active', w==='selected'); }
 
-    function createNewList() {
-      const state = getListsState();
-      const newId = state.nextListId;
-      state.nextListId += 1;
-      state.lists[newId] = state.lists[newId] || [];
-      setListsState(state);
-      currentListId = newId;
-      currentListInfo.textContent = `Current List No: ${currentListId}`;
-      listStatus.textContent = `Created List No. ${currentListId}.`;
-    }
-
-    async function searchRows() {
-      const machineNo = machineInput.value.trim();
-      if (!machineNo) { statusEl.textContent = 'Please enter a machine number.'; return; }
-      statusEl.textContent = 'Loading data from Google Sheet...';
-      resultTbody.innerHTML = '';
-      resultTable.hidden = true;
-      addSelectedBtn.disabled = true;
-      lastSearchRows = [];
-      try {
-        const res = await fetch(SHEET_CSV_URL);
-        if (!res.ok) throw new Error('Could not fetch Google Sheet. Ensure it is shared publicly/viewable.');
-        const allRows = parseRows(await res.text());
-        const filtered = allRows.filter(r => String(r['Machine No.']).trim() === machineNo);
-        lastSearchRows = filtered;
-        if (!filtered.length) { statusEl.textContent = `No rows found for Machine No. "${machineNo}".`; return; }
-        filtered.forEach((row, idx) => {
-          const tr = document.createElement('tr');
-          const selectTd = document.createElement('td');
-          const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.rowIndex = idx;
-          selectTd.appendChild(cb); tr.appendChild(selectTd);
-          REQUIRED_HEADERS.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
-          resultTbody.appendChild(tr);
-        });
-        resultTable.hidden = false;
-        addSelectedBtn.disabled = false;
-        statusEl.textContent = `${filtered.length} row(s) found for Machine No. "${machineNo}".`;
-      } catch (err) { statusEl.textContent = `Error: ${err.message}`; }
-    }
-
-    function addSelectedToCurrentList() {
-      if (!currentListId) { statusEl.textContent = 'Create a new list first.'; return; }
-      const checkboxes = resultTbody.querySelectorAll('input[type="checkbox"]:checked');
-      if (!checkboxes.length) { statusEl.textContent = 'Select at least one row.'; return; }
-      const state = getListsState();
-      const target = state.lists[currentListId] || [];
-      checkboxes.forEach(cb => {
-        const row = lastSearchRows[Number(cb.dataset.rowIndex)];
-        if (!row) return;
-        target.push({ 'List No.': currentListId, ...row });
-      });
-      state.lists[currentListId] = target;
-      setListsState(state);
-      statusEl.textContent = `${checkboxes.length} row(s) added to List No. ${currentListId}.`;
-    }
-
-    function loadList() {
-      const id = Number(downloadListIdInput.value);
-      if (!id || id < 1) { listStatus.textContent = 'Enter a valid List ID (1 or greater).'; return; }
-      const state = getListsState();
-      const rows = state.lists[id] || [];
-      selectedTbody.innerHTML = '';
-      selectedTable.hidden = true;
-      downloadBtn.disabled = true;
-      loadedListRows = [];
-      if (!rows.length) { listStatus.textContent = `No saved rows found for List No. ${id}.`; return; }
-      rows.forEach(row => {
-        const tr = document.createElement('tr');
-        const tdList = document.createElement('td'); tdList.textContent = row['List No.']; tr.appendChild(tdList);
-        REQUIRED_HEADERS.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
-        selectedTbody.appendChild(tr);
-      });
-      loadedListRows = rows;
-      selectedTable.hidden = false;
-      downloadBtn.disabled = false;
-      listStatus.textContent = `Loaded ${rows.length} row(s) for List No. ${id}.`;
-      downloadStatus.textContent = '';
-    }
-
-    function downloadList() {
-      if (!loadedListRows.length) return;
-      const headers = ['List No.', ...REQUIRED_HEADERS];
-      const ws = XLSX.utils.json_to_sheet(loadedListRows, { header: headers });
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'SelectedRows');
-      const listNo = loadedListRows[0]['List No.'];
-      XLSX.writeFile(wb, `selected_list_${listNo}.xlsx`);
-      downloadStatus.textContent = `Downloaded List No. ${listNo}.`;
-    }
-
-    function showTab(which) {
-      searchTab.classList.toggle('active', which === 'search');
-      selectedTab.classList.toggle('active', which === 'selected');
-    }
-
-    titleEl.textContent = getTodayTitle();
-    createListBtn.addEventListener('click', createNewList);
-    searchBtn.addEventListener('click', searchRows);
-    machineInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchRows(); });
-    addSelectedBtn.addEventListener('click', addSelectedToCurrentList);
-    loadListBtn.addEventListener('click', loadList);
-    downloadBtn.addEventListener('click', downloadList);
-    searchTabBtn.addEventListener('click', () => showTab('search'));
-    selectedTabBtn.addEventListener('click', () => showTab('selected'));
+    titleEl.textContent=getTodayTitle(); scriptUrlInput.value=getScriptUrl();
+    saveScriptUrlBtn.addEventListener('click', ()=>{ setScriptUrl(scriptUrlInput.value.trim()); statusEl.textContent='Script URL saved.'; });
+    createListBtn.addEventListener('click', createNewList); searchBtn.addEventListener('click', searchRows); machineInput.addEventListener('keydown', e=>{if(e.key==='Enter') searchRows();});
+    addSelectedBtn.addEventListener('click', addSelectedToCurrentList); loadListBtn.addEventListener('click', loadList); downloadBtn.addEventListener('click', downloadList);
+    searchTabBtn.addEventListener('click', ()=>showTab('search')); selectedTabBtn.addEventListener('click', ()=>showTab('selected'));
   </script>
 </body>
 </html>
