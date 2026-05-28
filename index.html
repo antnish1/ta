@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Machine No. Row Filter</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .row { margin-bottom: 12px; }
+    input, button { padding: 8px; font-size: 14px; }
+    button { cursor: pointer; margin-right: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    h2 { margin: 8px 0; }
+    .muted { color: #666; font-size: 13px; }
+    #status, #listStatus, #downloadStatus { margin-top: 8px; }
+    .tab-buttons { margin-top: 16px; }
+    .tab-buttons button { margin-right: 6px; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+  </style>
+</head>
+<body>
+  <h2 id="title">Engineer Tour Bill Date</h2>
+
+  <div class="row">
+    <button id="createListBtn">Create New List</button>
+    <span id="currentListInfo" class="muted">No active list yet.</span>
+  </div>
+
+  <div class="tab-buttons">
+    <button id="searchTabBtn">Search</button>
+    <button id="selectedTabBtn">Selected Rows</button>
+  </div>
+
+  <section id="searchTab" class="tab active">
+    <div class="row">
+      <label for="machineNo"><strong>Machine No. (exact):</strong></label><br />
+      <input id="machineNo" type="text" placeholder="Example: M1023" />
+      <button id="searchBtn">Search</button>
+      <button id="addSelectedBtn" disabled>Add Selected to Current List</button>
+    </div>
+    <div class="muted">Search and tick checkboxes to add rows to a list.</div>
+    <div id="status" class="muted"></div>
+
+    <table id="resultTable" hidden>
+      <thead>
+        <tr>
+          <th>Select</th>
+          <th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="selectedTab" class="tab">
+    <div class="row">
+      <label for="downloadListId"><strong>Enter List ID:</strong></label><br />
+      <input id="downloadListId" type="number" min="1" placeholder="Example: 1" />
+      <button id="loadListBtn">Load List</button>
+      <button id="downloadBtn" disabled>Download List Excel</button>
+    </div>
+    <div id="listStatus" class="muted"></div>
+    <div id="downloadStatus" class="muted"></div>
+
+    <table id="selectedTable" hidden>
+      <thead>
+        <tr>
+          <th>List No.</th>
+          <th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
+    const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
+
+    const titleEl = document.getElementById('title');
+    const currentListInfo = document.getElementById('currentListInfo');
+    const createListBtn = document.getElementById('createListBtn');
+
+    const machineInput = document.getElementById('machineNo');
+    const searchBtn = document.getElementById('searchBtn');
+    const addSelectedBtn = document.getElementById('addSelectedBtn');
+    const statusEl = document.getElementById('status');
+    const resultTable = document.getElementById('resultTable');
+    const resultTbody = resultTable.querySelector('tbody');
+
+    const searchTabBtn = document.getElementById('searchTabBtn');
+    const selectedTabBtn = document.getElementById('selectedTabBtn');
+    const searchTab = document.getElementById('searchTab');
+    const selectedTab = document.getElementById('selectedTab');
+
+    const selectedTable = document.getElementById('selectedTable');
+    const selectedTbody = selectedTable.querySelector('tbody');
+    const listStatus = document.getElementById('listStatus');
+    const downloadStatus = document.getElementById('downloadStatus');
+    const downloadListIdInput = document.getElementById('downloadListId');
+    const loadListBtn = document.getElementById('loadListBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let lastSearchRows = [];
+    let loadedListRows = [];
+    let currentListId = null;
+
+    function getTodayTitle() {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      return `Engineer Tour Bill Date ${dd}-${mm}-${yyyy}`;
+    }
+
+    function cleanHeader(value) {
+      return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    }
+
+    function formatDateValue(value) {
+      if (value === null || value === undefined) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+      const numeric = Number(text);
+      if (!Number.isNaN(numeric) && /^\d+(\.\d+)?$/.test(text)) {
+        const parsed = XLSX.SSF.parse_date_code(numeric);
+        if (parsed) return `${String(parsed.d).padStart(2, '0')}/${String(parsed.m).padStart(2, '0')}/${parsed.y}`;
+      }
+      const parts = text.split(/[\/-]/).map(v => v.trim());
+      if (parts.length === 3 && parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+      const jsDate = new Date(text);
+      if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
+      return text;
+    }
+
+    function findHeaderRowIndex(rows2d) { return rows2d.findIndex(row => row.some(cell => cleanHeader(cell).includes('machine no'))); }
+    function mapHeadersToIndex(headerRow) { const m={}; headerRow.forEach((h,i)=>{const k=cleanHeader(h); if(k) m[k]=i;}); return m; }
+    function pick(row, headerMap, aliases) { for (const alias of aliases) { const i=headerMap[cleanHeader(alias)]; if (i !== undefined) return row[i] ?? ''; } return ''; }
+
+    function parseRows(csvText) {
+      const wb = XLSX.read(csvText, { type: 'string' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const rows2d = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+      const headerIndex = findHeaderRowIndex(rows2d);
+      if (headerIndex === -1) throw new Error('Header row not found in sheet.');
+      const headerMap = mapHeadersToIndex(rows2d[headerIndex]);
+      const dataRows = rows2d.slice(headerIndex + 1).filter(r => r.some(v => String(v).trim() !== ''));
+      return dataRows.map(r => ({
+        'DATE': formatDateValue(pick(r, headerMap, ['Date', 'DATE'])),
+        'Location': pick(r, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+        'Engineer Name': pick(r, headerMap, ['Engineer Name', 'Name']),
+        'Workshop/Onsite': pick(r, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
+        'Call Type': pick(r, headerMap, ['Call Type', 'Type of Call']),
+        'primary / secondary Engineer': pick(r, headerMap, ['primary / secondary Engineer', 'Primary Engineer', 'Secondary Engineer']),
+        'Camplaint': pick(r, headerMap, ['Camplaint', 'Complaint']),
+        'Customer Name': pick(r, headerMap, ['Customer Name', 'Customer']),
+        'Machine No.': pick(r, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
+        'HMR': pick(r, headerMap, ['HMR']),
+        'Brekdown status': pick(r, headerMap, ['Brekdown status', 'Breakdown status', 'Machine Status']),
+        "Site's Location": pick(r, headerMap, ["Site's Location", 'Site Location', 'Location']),
+        'call id': pick(r, headerMap, ['call id', 'Call ID'])
+      }));
+    }
+
+    function getListsState() {
+      return JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{}}');
+    }
+    function setListsState(state) { localStorage.setItem('machineListsState', JSON.stringify(state)); }
+
+    function createNewList() {
+      const state = getListsState();
+      const newId = state.nextListId;
+      state.nextListId += 1;
+      state.lists[newId] = state.lists[newId] || [];
+      setListsState(state);
+      currentListId = newId;
+      currentListInfo.textContent = `Current List No: ${currentListId}`;
+      listStatus.textContent = `Created List No. ${currentListId}.`;
+    }
+
+    async function searchRows() {
+      const machineNo = machineInput.value.trim();
+      if (!machineNo) { statusEl.textContent = 'Please enter a machine number.'; return; }
+      statusEl.textContent = 'Loading data from Google Sheet...';
+      resultTbody.innerHTML = '';
+      resultTable.hidden = true;
+      addSelectedBtn.disabled = true;
+      lastSearchRows = [];
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error('Could not fetch Google Sheet. Ensure it is shared publicly/viewable.');
+        const allRows = parseRows(await res.text());
+        const filtered = allRows.filter(r => String(r['Machine No.']).trim() === machineNo);
+        lastSearchRows = filtered;
+        if (!filtered.length) { statusEl.textContent = `No rows found for Machine No. "${machineNo}".`; return; }
+        filtered.forEach((row, idx) => {
+          const tr = document.createElement('tr');
+          const selectTd = document.createElement('td');
+          const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.rowIndex = idx;
+          selectTd.appendChild(cb); tr.appendChild(selectTd);
+          REQUIRED_HEADERS.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
+          resultTbody.appendChild(tr);
+        });
+        resultTable.hidden = false;
+        addSelectedBtn.disabled = false;
+        statusEl.textContent = `${filtered.length} row(s) found for Machine No. "${machineNo}".`;
+      } catch (err) { statusEl.textContent = `Error: ${err.message}`; }
+    }
+
+    function addSelectedToCurrentList() {
+      if (!currentListId) { statusEl.textContent = 'Create a new list first.'; return; }
+      const checkboxes = resultTbody.querySelectorAll('input[type="checkbox"]:checked');
+      if (!checkboxes.length) { statusEl.textContent = 'Select at least one row.'; return; }
+      const state = getListsState();
+      const target = state.lists[currentListId] || [];
+      checkboxes.forEach(cb => {
+        const row = lastSearchRows[Number(cb.dataset.rowIndex)];
+        if (!row) return;
+        target.push({ 'List No.': currentListId, ...row });
+      });
+      state.lists[currentListId] = target;
+      setListsState(state);
+      statusEl.textContent = `${checkboxes.length} row(s) added to List No. ${currentListId}.`;
+    }
+
+    function loadList() {
+      const id = Number(downloadListIdInput.value);
+      if (!id || id < 1) { listStatus.textContent = 'Enter a valid List ID (1 or greater).'; return; }
+      const state = getListsState();
+      const rows = state.lists[id] || [];
+      selectedTbody.innerHTML = '';
+      selectedTable.hidden = true;
+      downloadBtn.disabled = true;
+      loadedListRows = [];
+      if (!rows.length) { listStatus.textContent = `No saved rows found for List No. ${id}.`; return; }
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        const tdList = document.createElement('td'); tdList.textContent = row['List No.']; tr.appendChild(tdList);
+        REQUIRED_HEADERS.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
+        selectedTbody.appendChild(tr);
+      });
+      loadedListRows = rows;
+      selectedTable.hidden = false;
+      downloadBtn.disabled = false;
+      listStatus.textContent = `Loaded ${rows.length} row(s) for List No. ${id}.`;
+      downloadStatus.textContent = '';
+    }
+
+    function downloadList() {
+      if (!loadedListRows.length) return;
+      const headers = ['List No.', ...REQUIRED_HEADERS];
+      const ws = XLSX.utils.json_to_sheet(loadedListRows, { header: headers });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'SelectedRows');
+      const listNo = loadedListRows[0]['List No.'];
+      XLSX.writeFile(wb, `selected_list_${listNo}.xlsx`);
+      downloadStatus.textContent = `Downloaded List No. ${listNo}.`;
+    }
+
+    function showTab(which) {
+      searchTab.classList.toggle('active', which === 'search');
+      selectedTab.classList.toggle('active', which === 'selected');
+    }
+
+    titleEl.textContent = getTodayTitle();
+    createListBtn.addEventListener('click', createNewList);
+    searchBtn.addEventListener('click', searchRows);
+    machineInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') searchRows(); });
+    addSelectedBtn.addEventListener('click', addSelectedToCurrentList);
+    loadListBtn.addEventListener('click', loadList);
+    downloadBtn.addEventListener('click', downloadList);
+    searchTabBtn.addEventListener('click', () => showTab('search'));
+    selectedTabBtn.addEventListener('click', () => showTab('selected'));
+  </script>
+</body>
+</html>
