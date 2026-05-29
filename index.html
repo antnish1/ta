@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Machine No. Row Filter</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .row { margin-bottom: 12px; }
+    input, button { padding: 8px; font-size: 14px; }
+    button { cursor: pointer; margin-right: 8px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+    h2 { margin: 8px 0; }
+    .muted { color: #666; font-size: 13px; }
+    .error { color: #b00020; }
+    .success { color: #146c2e; }
+    #status, #listStatus, #downloadStatus, #scriptUrlStatus { margin-top: 8px; }
+    .tab-buttons { margin-top: 16px; }
+    .tab-buttons button { margin-right: 6px; }
+    .tab { display: none; }
+    .tab.active { display: block; }
+  </style>
+</head>
+<body>
+  <h2 id="title">Engineer Tour Bill Date</h2>
+
+  <div class="row">
+    <button id="createListBtn">Create New List</button>
+    <span id="currentListInfo" class="muted">No active list yet.</span>
+  </div>
+
+  <div class="row">
+    <label for="scriptUrl"><strong>Apps Script Web App URL for saving to Google Sheet:</strong></label><br />
+    <input id="scriptUrl" type="text" placeholder="Paste URL ending with /exec, not the spreadsheet URL" style="width: 620px;" />
+    <button id="saveScriptUrlBtn">Save URL</button>
+    <div id="scriptUrlStatus" class="muted">Use the deployed Apps Script Web App URL. A normal docs.google.com spreadsheet URL cannot save rows.</div>
+  </div>
+
+  <div class="tab-buttons">
+    <button id="searchTabBtn">Search</button>
+    <button id="selectedTabBtn">Selected Rows</button>
+  </div>
+
+  <section id="searchTab" class="tab active">
+    <div class="row">
+      <label for="machineNo"><strong>Machine No. (exact):</strong></label><br />
+      <input id="machineNo" type="text" placeholder="Example: M1023" />
+      <button id="searchBtn">Search</button>
+      <button id="addSelectedBtn" disabled>Add Selected to Current List</button>
+    </div>
+    <div class="muted">Search and tick checkboxes to add rows to a list.</div>
+    <div id="status" class="muted"></div>
+
+    <table id="resultTable" hidden>
+      <thead>
+        <tr>
+          <th>Select</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <section id="selectedTab" class="tab">
+    <div class="row">
+      <label for="downloadListId"><strong>Enter List ID:</strong></label><br />
+      <input id="downloadListId" type="number" min="1" placeholder="Example: 1" />
+      <button id="loadListBtn">Load List</button>
+      <button id="downloadBtn" disabled>Download List Excel</button>
+    </div>
+    <div id="listStatus" class="muted"></div>
+    <div id="downloadStatus" class="muted"></div>
+
+    <table id="selectedTable" hidden>
+      <thead>
+        <tr>
+          <th>List No.</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+          <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+          <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
+    const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
+
+    const titleEl = document.getElementById('title');
+    const currentListInfo = document.getElementById('currentListInfo');
+    const createListBtn = document.getElementById('createListBtn');
+    const scriptUrlInput = document.getElementById('scriptUrl');
+    const saveScriptUrlBtn = document.getElementById('saveScriptUrlBtn');
+    const scriptUrlStatus = document.getElementById('scriptUrlStatus');
+    const machineInput = document.getElementById('machineNo');
+    const searchBtn = document.getElementById('searchBtn');
+    const addSelectedBtn = document.getElementById('addSelectedBtn');
+    const statusEl = document.getElementById('status');
+    const resultTable = document.getElementById('resultTable');
+    const resultTbody = resultTable.querySelector('tbody');
+    const searchTabBtn = document.getElementById('searchTabBtn');
+    const selectedTabBtn = document.getElementById('selectedTabBtn');
+    const searchTab = document.getElementById('searchTab');
+    const selectedTab = document.getElementById('selectedTab');
+    const selectedTable = document.getElementById('selectedTable');
+    const selectedTbody = selectedTable.querySelector('tbody');
+    const listStatus = document.getElementById('listStatus');
+    const downloadStatus = document.getElementById('downloadStatus');
+    const downloadListIdInput = document.getElementById('downloadListId');
+    const loadListBtn = document.getElementById('loadListBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let lastSearchRows = [];
+    let loadedListRows = [];
+    let currentListId = null;
+
+    function getTodayTitle() {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      return `Engineer Tour Bill Date ${dd}-${mm}-${yyyy}`;
+    }
+
+    function getListsState() {
+      return JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{}}');
+    }
+
+    function setListsState(state) {
+      localStorage.setItem('machineListsState', JSON.stringify(state));
+    }
+
+    function getScriptUrl() {
+      return localStorage.getItem('selectedRowsScriptUrl') || '';
+    }
+
+    function isSpreadsheetUrl(url) {
+      return url.includes('docs.google.com/spreadsheets');
+    }
+
+    function isAppsScriptUrl(url) {
+      return /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url) || /^https:\/\/script\.googleusercontent\.com\//.test(url);
+    }
+
+    function validateScriptUrl(url) {
+      if (!url) return { ok: false, message: 'Paste the Apps Script Web App URL first.' };
+      if (isSpreadsheetUrl(url)) return { ok: false, message: 'This is the spreadsheet URL. Please deploy Apps Script and paste the Web App URL ending with /exec.' };
+      if (!isAppsScriptUrl(url)) return { ok: false, message: 'Invalid URL. Paste the Apps Script Web App URL from Deploy > Web app. It should normally start with https://script.google.com/macros/s/ and end with /exec.' };
+      return { ok: true, message: 'Apps Script URL saved.' };
+    }
+
+    function saveScriptUrl() {
+      const url = scriptUrlInput.value.trim();
+      const validation = validateScriptUrl(url);
+      scriptUrlStatus.textContent = validation.message;
+      scriptUrlStatus.className = validation.ok ? 'success' : 'error';
+      if (!validation.ok) return;
+      localStorage.setItem('selectedRowsScriptUrl', url);
+    }
+
+    function cleanHeader(value) {
+      return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    }
+
+    function formatDateValue(value) {
+      if (value === null || value === undefined) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+
+      const numeric = Number(text);
+      if (!Number.isNaN(numeric) && /^\d+(\.\d+)?$/.test(text)) {
+        const parsed = XLSX.SSF.parse_date_code(numeric);
+        if (parsed) return `${String(parsed.d).padStart(2, '0')}/${String(parsed.m).padStart(2, '0')}/${parsed.y}`;
+      }
+
+      const parts = text.split(/[\/-]/).map(v => v.trim());
+      if (parts.length === 3 && parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+
+      const jsDate = new Date(text);
+      if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
+
+      return text;
+    }
+
+    function findHeaderRowIndex(rows2d) {
+      return rows2d.findIndex(row => row.some(cell => cleanHeader(cell).includes('machine no')));
+    }
+
+    function mapHeadersToIndex(headerRow) {
+      const map = {};
+      headerRow.forEach((header, index) => {
+        const key = cleanHeader(header);
+        if (key) map[key] = index;
+      });
+      return map;
+    }
+
+    function pick(row, headerMap, aliases) {
+      for (const alias of aliases) {
+        const index = headerMap[cleanHeader(alias)];
+        if (index !== undefined) return row[index] ?? '';
+      }
+      return '';
+    }
+
+    function parseRows(csvText) {
+      const workbook = XLSX.read(csvText, { type: 'string' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows2d = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const headerIndex = findHeaderRowIndex(rows2d);
+      if (headerIndex === -1) throw new Error('Header row not found in sheet.');
+
+      const headerMap = mapHeadersToIndex(rows2d[headerIndex]);
+      const dataRows = rows2d.slice(headerIndex + 1).filter(row => row.some(value => String(value).trim() !== ''));
+      return dataRows.map(row => ({
+        'DATE': formatDateValue(pick(row, headerMap, ['Date', 'DATE'])),
+        'Location': pick(row, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+        'Engineer Name': pick(row, headerMap, ['Engineer Name', 'Name']),
+        'Workshop/Onsite': pick(row, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
+        'Call Type': pick(row, headerMap, ['Call Type', 'Type of Call']),
+        'primary / secondary Engineer': pick(row, headerMap, ['primary / secondary Engineer', 'Primary Engineer', 'Secondary Engineer']),
+        'Camplaint': pick(row, headerMap, ['Camplaint', 'Complaint']),
+        'Customer Name': pick(row, headerMap, ['Customer Name', 'Customer']),
+        'Machine No.': pick(row, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
+        'HMR': pick(row, headerMap, ['HMR']),
+        'Brekdown status': pick(row, headerMap, ['Brekdown status', 'Breakdown status', 'Machine Status']),
+        "Site's Location": pick(row, headerMap, ["Site's Location", 'Site Location', 'Location']),
+        'call id': pick(row, headerMap, ['call id', 'Call ID'])
+      }));
+    }
+
+    function callAppsScriptJsonp(params) {
+      const scriptUrl = getScriptUrl();
+      const validation = validateScriptUrl(scriptUrl);
+      if (!validation.ok) return Promise.reject(new Error(validation.message));
+
+      return new Promise((resolve, reject) => {
+        const callbackName = `appsScriptCallback_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        const script = document.createElement('script');
+        const query = new URLSearchParams({ ...params, callback: callbackName });
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script did not respond. Check deployment permissions.'));
+        }, 15000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          delete window[callbackName];
+          script.remove();
+        }
+
+        window[callbackName] = data => {
+          cleanup();
+          if (data && data.ok === false) reject(new Error(data.error || 'Apps Script returned an error.'));
+          else resolve(data);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Could not reach Apps Script Web App URL.'));
+        };
+
+        script.src = `${scriptUrl}?${query.toString()}`;
+        document.body.appendChild(script);
+      });
+    }
+
+    function postRowsToAppsScript(rows) {
+      const scriptUrl = getScriptUrl();
+      const validation = validateScriptUrl(scriptUrl);
+      if (!validation.ok) return Promise.reject(new Error(validation.message));
+
+      return new Promise((resolve, reject) => {
+        const iframeName = `appsScriptPostFrame_${Date.now()}`;
+        const iframe = document.createElement('iframe');
+        iframe.name = iframeName;
+        iframe.style.display = 'none';
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = scriptUrl;
+        form.target = iframeName;
+        form.style.display = 'none';
+
+        const payloadInput = document.createElement('input');
+        payloadInput.type = 'hidden';
+        payloadInput.name = 'payload';
+        payloadInput.value = JSON.stringify({ action: 'appendSelectedRows', rows });
+        form.appendChild(payloadInput);
+
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script save timed out. Check Web App deployment permissions.'));
+        }, 15000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          iframe.remove();
+          form.remove();
+        }
+
+        iframe.onload = () => {
+          cleanup();
+          resolve(true);
+        };
+
+        document.body.appendChild(iframe);
+        document.body.appendChild(form);
+        form.submit();
+      });
+    }
+
+    async function createNewList() {
+      const scriptUrl = getScriptUrl();
+      if (scriptUrl && validateScriptUrl(scriptUrl).ok) {
+        try {
+          const data = await callAppsScriptJsonp({ action: 'createList' });
+          currentListId = data.listId;
+          currentListInfo.textContent = `Current List No: ${currentListId}`;
+          listStatus.textContent = `Created shared Google Sheet List No. ${currentListId}.`;
+          return;
+        } catch (err) {
+          listStatus.textContent = `Google Sheet list creation failed, created local list instead: ${err.message}`;
+        }
+      }
+
+      const state = getListsState();
+      const id = state.nextListId;
+      state.nextListId += 1;
+      state.lists[id] = state.lists[id] || [];
+      setListsState(state);
+      currentListId = id;
+      currentListInfo.textContent = `Current List No: ${id}`;
+      if (!scriptUrl) listStatus.textContent = `Created local List No. ${id}. Add Apps Script URL for shared Google Sheet saving.`;
+    }
+
+    async function searchRows() {
+      const machineNo = machineInput.value.trim();
+      if (!machineNo) {
+        statusEl.textContent = 'Please enter a machine number.';
+        return;
+      }
+
+      statusEl.textContent = 'Loading data from Google Sheet...';
+      resultTbody.innerHTML = '';
+      resultTable.hidden = true;
+      addSelectedBtn.disabled = true;
+      lastSearchRows = [];
+
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error('Could not fetch Google Sheet. Ensure it is shared publicly/viewable.');
+        const filtered = parseRows(await res.text()).filter(row => String(row['Machine No.']).trim() === machineNo);
+        lastSearchRows = filtered;
+
+        if (!filtered.length) {
+          statusEl.textContent = `No rows found for Machine No. "${machineNo}".`;
+          return;
+        }
+
+        filtered.forEach((row, index) => {
+          const tr = document.createElement('tr');
+          const selectTd = document.createElement('td');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.dataset.rowIndex = index;
+          selectTd.appendChild(checkbox);
+          tr.appendChild(selectTd);
+
+          REQUIRED_HEADERS.forEach(header => {
+            const td = document.createElement('td');
+            td.textContent = row[header] ?? '';
+            tr.appendChild(td);
+          });
+
+          resultTbody.appendChild(tr);
+        });
+
+        resultTable.hidden = false;
+        addSelectedBtn.disabled = false;
+        statusEl.textContent = `${filtered.length} row(s) found for Machine No. "${machineNo}".`;
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+      }
+    }
+
+    async function addSelectedToCurrentList() {
+      if (!currentListId) {
+        statusEl.textContent = 'Create a new list first.';
+        return;
+      }
+
+      const checkboxes = resultTbody.querySelectorAll('input[type="checkbox"]:checked');
+      if (!checkboxes.length) {
+        statusEl.textContent = 'Select at least one row.';
+        return;
+      }
+
+      const state = getListsState();
+      const target = state.lists[currentListId] || [];
+      const addedRows = [];
+
+      checkboxes.forEach(checkbox => {
+        const row = lastSearchRows[Number(checkbox.dataset.rowIndex)];
+        if (!row) return;
+        const rowWithList = { 'List No.': currentListId, ...row };
+        target.push(rowWithList);
+        addedRows.push(rowWithList);
+      });
+
+      state.lists[currentListId] = target;
+      setListsState(state);
+
+      try {
+        await postRowsToAppsScript(addedRows);
+        statusEl.textContent = `${addedRows.length} row(s) sent to Google Sheet tab "Selected Rows" for List No. ${currentListId}.`;
+        statusEl.className = 'success';
+      } catch (err) {
+        statusEl.textContent = `${addedRows.length} row(s) saved locally, but not saved to Google Sheet: ${err.message}`;
+        statusEl.className = 'error';
+      }
+    }
+
+    function renderSelectedRows(rows, listId, source) {
+      selectedTbody.innerHTML = '';
+      selectedTable.hidden = true;
+      downloadBtn.disabled = true;
+      loadedListRows = [];
+
+      if (!rows.length) {
+        listStatus.textContent = `No saved rows found for List No. ${listId}.`;
+        return;
+      }
+
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        const listTd = document.createElement('td');
+        listTd.textContent = row['List No.'];
+        tr.appendChild(listTd);
+
+        REQUIRED_HEADERS.forEach(header => {
+          const td = document.createElement('td');
+          td.textContent = row[header] ?? '';
+          tr.appendChild(td);
+        });
+
+        selectedTbody.appendChild(tr);
+      });
+
+      loadedListRows = rows;
+      selectedTable.hidden = false;
+      downloadBtn.disabled = false;
+      listStatus.textContent = `Loaded ${rows.length} row(s) for List No. ${listId} from ${source}.`;
+    }
+
+    async function loadList() {
+      const listId = Number(downloadListIdInput.value);
+      if (!listId || listId < 1) {
+        listStatus.textContent = 'Enter a valid List ID (1 or greater).';
+        return;
+      }
+
+      if (getScriptUrl()) {
+        try {
+          const data = await callAppsScriptJsonp({ action: 'getList', listId });
+          renderSelectedRows(data.rows || [], listId, 'Google Sheet');
+          downloadStatus.textContent = '';
+          return;
+        } catch (err) {
+          downloadStatus.textContent = `Google Sheet load failed, using local data: ${err.message}`;
+        }
+      }
+
+      const localRows = getListsState().lists[listId] || [];
+      renderSelectedRows(localRows, listId, 'this browser');
+    }
+
+    function downloadList() {
+      if (!loadedListRows.length) return;
+      const headers = ['List No.', ...REQUIRED_HEADERS];
+      const worksheet = XLSX.utils.json_to_sheet(loadedListRows, { header: headers });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedRows');
+      const listId = loadedListRows[0]['List No.'];
+      XLSX.writeFile(workbook, `selected_list_${listId}.xlsx`);
+      downloadStatus.textContent = `Downloaded List No. ${listId}.`;
+    }
+
+    function showTab(which) {
+      searchTab.classList.toggle('active', which === 'search');
+      selectedTab.classList.toggle('active', which === 'selected');
+    }
+
+    titleEl.textContent = getTodayTitle();
+    scriptUrlInput.value = getScriptUrl();
+    saveScriptUrlBtn.addEventListener('click', saveScriptUrl);
+    createListBtn.addEventListener('click', createNewList);
+    searchBtn.addEventListener('click', searchRows);
+    machineInput.addEventListener('keydown', e => { if (e.key === 'Enter') searchRows(); });
+    addSelectedBtn.addEventListener('click', addSelectedToCurrentList);
+    loadListBtn.addEventListener('click', loadList);
+    downloadBtn.addEventListener('click', downloadList);
+    searchTabBtn.addEventListener('click', () => showTab('search'));
+    selectedTabBtn.addEventListener('click', () => showTab('selected'));
+  </script>
+</body>
+</html>
