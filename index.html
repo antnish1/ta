@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Machine No. Row Filter</title>
+  <style>
+    :root {
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --text: #172033;
+      --muted: #5f6b7a;
+      --primary: #1d4ed8;
+      --primary-dark: #173ea8;
+      --border: #d8dee9;
+      --success: #146c2e;
+      --error: #b00020;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, sans-serif;
+    }
+
+    .page-shell { max-width: 1180px; margin: 0 auto; padding: 28px; }
+    .header { margin-bottom: 24px; }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 24px; margin-bottom: 8px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .success { color: var(--success); }
+    .error { color: var(--error); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 8px 24px rgba(23, 32, 51, 0.08);
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+
+    .landing {
+      min-height: 55vh;
+      display: grid;
+      place-items: center;
+      text-align: center;
+    }
+
+    .landing .card { max-width: 560px; width: 100%; }
+    .app-page[hidden], .landing[hidden] { display: none; }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      margin-bottom: 18px;
+    }
+
+    .list-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid #bcd1ff;
+      background: #eef4ff;
+      color: #163b85;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 700;
+    }
+
+    label { display: block; font-weight: 700; margin-bottom: 6px; }
+    .form-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+    .field { min-width: 260px; flex: 1; }
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 16px;
+      padding: 11px 12px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 15px;
+      font-weight: 700;
+      padding: 12px 18px;
+    }
+
+    button:disabled { cursor: not-allowed; opacity: 0.6; }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: var(--primary-dark); }
+    .btn-secondary { background: #e9eef8; color: #172033; }
+    .btn-success { background: #16803c; color: #fff; }
+
+    .status { margin-top: 12px; min-height: 20px; }
+    .table-wrap { overflow-x: auto; margin-top: 16px; }
+    table { border-collapse: collapse; width: 100%; min-width: 1200px; background: #fff; }
+    th, td { border: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #f1f5fb; font-weight: 700; }
+
+    .loader-overlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(245, 247, 251, 0.78);
+      z-index: 999;
+    }
+
+    .loader-overlay.active { display: flex; }
+    .loader-box {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(23, 32, 51, 0.16);
+      padding: 18px 22px;
+      font-weight: 700;
+    }
+
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 4px solid #d7e2ff;
+      border-top-color: var(--primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <div id="loaderOverlay" class="loader-overlay" aria-live="polite" aria-busy="true">
+    <div class="loader-box"><span class="spinner"></span><span id="loaderText">Loading...</span></div>
+  </div>
+
+  <main class="page-shell">
+    <header class="header">
+      <h1 id="title">Engineer Tour Bill Date</h1>
+      <p class="muted">Create a list, search by machine number, select rows, and save them to Google Sheet.</p>
+    </header>
+
+    <section id="landingPage" class="landing">
+      <div class="card">
+        <h2>Create New List</h2>
+        <p class="muted">Start here. A new progressive list number will be created automatically.</p>
+        <button id="createListBtn" class="btn-primary">Create List</button>
+        <div id="landingStatus" class="status muted"></div>
+      </div>
+    </section>
+
+    <section id="appPage" class="app-page" hidden>
+      <div class="toolbar">
+        <span id="currentListInfo" class="list-badge">No active list yet</span>
+        <button id="newListBtn" class="btn-secondary">Create Another List</button>
+      </div>
+
+      <section class="card">
+        <h2>Search Machine Number</h2>
+        <p class="muted">Enter exact machine number, then select rows you want to add to the active list.</p>
+        <div class="form-row">
+          <div class="field">
+            <label for="machineNo">Machine No. (exact)</label>
+            <input id="machineNo" type="text" placeholder="Example: 2895045" />
+          </div>
+          <button id="searchBtn" class="btn-primary">Search</button>
+          <button id="addSelectedBtn" class="btn-success" disabled>Add Selected to Current List</button>
+        </div>
+        <div id="status" class="status muted"></div>
+
+        <div class="table-wrap">
+          <table id="resultTable" hidden>
+            <thead>
+              <tr>
+                <th>Select</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+                <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+                <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Selected Rows</h2>
+        <p class="muted">Load or download saved rows by list number.</p>
+        <div class="form-row">
+          <div class="field">
+            <label for="downloadListId">List ID</label>
+            <input id="downloadListId" type="number" min="1" placeholder="Example: 1" />
+          </div>
+          <button id="loadListBtn" class="btn-secondary">Load List</button>
+          <button id="downloadBtn" class="btn-primary" disabled>Download List Excel</button>
+        </div>
+        <div id="listStatus" class="status muted"></div>
+        <div id="downloadStatus" class="status muted"></div>
+
+        <div class="table-wrap">
+          <table id="selectedTable" hidden>
+            <thead>
+              <tr>
+                <th>List No.</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Workshop/Onsite</th><th>Call Type</th>
+                <th>primary / secondary Engineer</th><th>Camplaint</th><th>Customer Name</th><th>Machine No.</th><th>HMR</th>
+                <th>Brekdown status</th><th>Site's Location</th><th>call id</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script>
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AjPYajbXUv9C9JJenKhs-1GyCJuBO6LstQuOjKk6rjw2ZkwajVecJgoDGmENzXJ-JQ/exec';
+    const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
+
+    const titleEl = document.getElementById('title');
+    const landingPage = document.getElementById('landingPage');
+    const appPage = document.getElementById('appPage');
+    const loaderOverlay = document.getElementById('loaderOverlay');
+    const loaderText = document.getElementById('loaderText');
+    const landingStatus = document.getElementById('landingStatus');
+    const currentListInfo = document.getElementById('currentListInfo');
+    const createListBtn = document.getElementById('createListBtn');
+    const newListBtn = document.getElementById('newListBtn');
+    const machineInput = document.getElementById('machineNo');
+    const searchBtn = document.getElementById('searchBtn');
+    const addSelectedBtn = document.getElementById('addSelectedBtn');
+    const statusEl = document.getElementById('status');
+    const resultTable = document.getElementById('resultTable');
+    const resultTbody = resultTable.querySelector('tbody');
+    const selectedTable = document.getElementById('selectedTable');
+    const selectedTbody = selectedTable.querySelector('tbody');
+    const listStatus = document.getElementById('listStatus');
+    const downloadStatus = document.getElementById('downloadStatus');
+    const downloadListIdInput = document.getElementById('downloadListId');
+    const loadListBtn = document.getElementById('loadListBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    let lastSearchRows = [];
+    let loadedListRows = [];
+    let currentListId = null;
+
+    function setLoading(isLoading, message = 'Loading...') {
+      loaderText.textContent = message;
+      loaderOverlay.classList.toggle('active', isLoading);
+      [createListBtn, newListBtn, searchBtn, addSelectedBtn, loadListBtn, downloadBtn].forEach(button => {
+        if (button) button.disabled = isLoading || (button === addSelectedBtn && lastSearchRows.length === 0) || (button === downloadBtn && loadedListRows.length === 0);
+      });
+    }
+
+    function showAppPage(listId) {
+      currentListId = listId;
+      currentListInfo.textContent = `Current List No: ${listId}`;
+      downloadListIdInput.value = listId;
+      landingPage.hidden = true;
+      appPage.hidden = false;
+      machineInput.focus();
+    }
+
+    function getTodayTitle() {
+      const today = new Date();
+      const dd = String(today.getDate()).padStart(2, '0');
+      const mm = String(today.getMonth() + 1).padStart(2, '0');
+      const yyyy = today.getFullYear();
+      return `Engineer Tour Bill Date ${dd}-${mm}-${yyyy}`;
+    }
+
+    function getListsState() {
+      return JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{}}');
+    }
+
+    function setListsState(state) {
+      localStorage.setItem('machineListsState', JSON.stringify(state));
+    }
+
+    function getScriptUrl() {
+      const savedUrl = localStorage.getItem('selectedRowsScriptUrl') || '';
+      if (savedUrl && !isSpreadsheetUrl(savedUrl) && isAppsScriptUrl(savedUrl)) return savedUrl;
+      return DEFAULT_APPS_SCRIPT_URL;
+    }
+
+    function isSpreadsheetUrl(url) {
+      return url.includes('docs.google.com/spreadsheets');
+    }
+
+    function isAppsScriptUrl(url) {
+      return /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url) || /^https:\/\/script\.googleusercontent\.com\//.test(url);
+    }
+
+    function validateScriptUrl(url) {
+      if (!url) return { ok: false, message: 'Apps Script Web App URL is missing.' };
+      if (isSpreadsheetUrl(url)) return { ok: false, message: 'Saved URL is a spreadsheet URL, not an Apps Script Web App URL.' };
+      if (!isAppsScriptUrl(url)) return { ok: false, message: 'Apps Script Web App URL is invalid.' };
+      return { ok: true };
+    }
+
+    function cleanHeader(value) {
+      return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    }
+
+    function formatDateValue(value) {
+      if (value === null || value === undefined) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+
+      const numeric = Number(text);
+      if (!Number.isNaN(numeric) && /^\d+(\.\d+)?$/.test(text)) {
+        const parsed = XLSX.SSF.parse_date_code(numeric);
+        if (parsed) return `${String(parsed.d).padStart(2, '0')}/${String(parsed.m).padStart(2, '0')}/${parsed.y}`;
+      }
+
+      const parts = text.split(/[\/-]/).map(valuePart => valuePart.trim());
+      if (parts.length === 3 && parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+
+      const jsDate = new Date(text);
+      if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
+
+      return text;
+    }
+
+    function findHeaderRowIndex(rows2d) {
+      return rows2d.findIndex(row => row.some(cell => cleanHeader(cell).includes('machine no')));
+    }
+
+    function mapHeadersToIndex(headerRow) {
+      const map = {};
+      headerRow.forEach((header, index) => {
+        const key = cleanHeader(header);
+        if (key) map[key] = index;
+      });
+      return map;
+    }
+
+    function pick(row, headerMap, aliases) {
+      for (const alias of aliases) {
+        const index = headerMap[cleanHeader(alias)];
+        if (index !== undefined) return row[index] ?? '';
+      }
+      return '';
+    }
+
+    function parseRows(csvText) {
+      const workbook = XLSX.read(csvText, { type: 'string' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows2d = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+      const headerIndex = findHeaderRowIndex(rows2d);
+      if (headerIndex === -1) throw new Error('Header row not found in sheet.');
+
+      const headerMap = mapHeadersToIndex(rows2d[headerIndex]);
+      const dataRows = rows2d.slice(headerIndex + 1).filter(row => row.some(value => String(value).trim() !== ''));
+      return dataRows.map(row => ({
+        'DATE': formatDateValue(pick(row, headerMap, ['Date', 'DATE'])),
+        'Location': pick(row, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+        'Engineer Name': pick(row, headerMap, ['Engineer Name', 'Name']),
+        'Workshop/Onsite': pick(row, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
+        'Call Type': pick(row, headerMap, ['Call Type', 'Type of Call']),
+        'primary / secondary Engineer': pick(row, headerMap, ['primary / secondary Engineer', 'Primary Engineer', 'Secondary Engineer']),
+        'Camplaint': pick(row, headerMap, ['Camplaint', 'Complaint']),
+        'Customer Name': pick(row, headerMap, ['Customer Name', 'Customer']),
+        'Machine No.': pick(row, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
+        'HMR': pick(row, headerMap, ['HMR']),
+        'Brekdown status': pick(row, headerMap, ['Brekdown status', 'Breakdown status', 'Machine Status']),
+        "Site's Location": pick(row, headerMap, ["Site's Location", 'Site Location', 'Location']),
+        'call id': pick(row, headerMap, ['call id', 'Call ID'])
+      }));
+    }
+
+    function callAppsScriptJsonp(params) {
+      const scriptUrl = getScriptUrl();
+      const validation = validateScriptUrl(scriptUrl);
+      if (!validation.ok) return Promise.reject(new Error(validation.message));
+
+      return new Promise((resolve, reject) => {
+        const callbackName = `appsScriptCallback_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        const script = document.createElement('script');
+        const query = new URLSearchParams({ ...params, callback: callbackName });
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script did not respond. Check deployment permissions.'));
+        }, 15000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          delete window[callbackName];
+          script.remove();
+        }
+
+        window[callbackName] = data => {
+          cleanup();
+          if (data && data.ok === false) reject(new Error(data.error || 'Apps Script returned an error.'));
+          else resolve(data);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Could not reach Apps Script Web App URL.'));
+        };
+
+        script.src = `${scriptUrl}?${query.toString()}`;
+        document.body.appendChild(script);
+      });
+    }
+
+    function appendRowsToAppsScript(rows) {
+      return callAppsScriptJsonp({
+        action: 'appendSelectedRows',
+        payload: JSON.stringify({ rows })
+      });
+    }
+
+    function showSuccessPopup(message) {
+      window.alert(message);
+    }
+
+    async function createNewList() {
+      setLoading(true, 'Creating list...');
+      landingStatus.textContent = '';
+
+      try {
+        const data = await callAppsScriptJsonp({ action: 'createList' });
+        showAppPage(data.listId);
+        listStatus.textContent = `Created shared Google Sheet List No. ${data.listId}.`;
+      } catch (err) {
+        const state = getListsState();
+        const id = state.nextListId;
+        state.nextListId += 1;
+        state.lists[id] = state.lists[id] || [];
+        setListsState(state);
+        showAppPage(id);
+        landingStatus.textContent = '';
+        listStatus.textContent = `Google Sheet list creation failed, created local List No. ${id}: ${err.message}`;
+        listStatus.className = 'status error';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function searchRows() {
+      const machineNo = machineInput.value.trim();
+      if (!machineNo) {
+        statusEl.textContent = 'Please enter a machine number.';
+        statusEl.className = 'status error';
+        return;
+      }
+
+      setLoading(true, 'Searching machine number...');
+      statusEl.textContent = '';
+      statusEl.className = 'status muted';
+      resultTbody.innerHTML = '';
+      resultTable.hidden = true;
+      addSelectedBtn.disabled = true;
+      lastSearchRows = [];
+
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error('Could not fetch Google Sheet. Ensure it is shared publicly/viewable.');
+        const filtered = parseRows(await res.text()).filter(row => String(row['Machine No.']).trim() === machineNo);
+        lastSearchRows = filtered;
+
+        if (!filtered.length) {
+          statusEl.textContent = `No rows found for Machine No. "${machineNo}".`;
+          return;
+        }
+
+        filtered.forEach((row, index) => {
+          const tr = document.createElement('tr');
+          const selectTd = document.createElement('td');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.dataset.rowIndex = index;
+          selectTd.appendChild(checkbox);
+          tr.appendChild(selectTd);
+
+          REQUIRED_HEADERS.forEach(header => {
+            const td = document.createElement('td');
+            td.textContent = row[header] ?? '';
+            tr.appendChild(td);
+          });
+
+          resultTbody.appendChild(tr);
+        });
+
+        resultTable.hidden = false;
+        addSelectedBtn.disabled = false;
+        statusEl.textContent = `${filtered.length} row(s) found for Machine No. "${machineNo}".`;
+        statusEl.className = 'status success';
+      } catch (err) {
+        statusEl.textContent = `Error: ${err.message}`;
+        statusEl.className = 'status error';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function addSelectedToCurrentList() {
+      if (!currentListId) {
+        statusEl.textContent = 'Create a new list first.';
+        statusEl.className = 'status error';
+        return;
+      }
+
+      const checkboxes = resultTbody.querySelectorAll('input[type="checkbox"]:checked');
+      if (!checkboxes.length) {
+        statusEl.textContent = 'Select at least one row.';
+        statusEl.className = 'status error';
+        return;
+      }
+
+      setLoading(true, 'Saving selected rows...');
+      const state = getListsState();
+      const target = state.lists[currentListId] || [];
+      const addedRows = [];
+
+      checkboxes.forEach(checkbox => {
+        const row = lastSearchRows[Number(checkbox.dataset.rowIndex)];
+        if (!row) return;
+        const rowWithList = { 'List No.': currentListId, ...row };
+        target.push(rowWithList);
+        addedRows.push(rowWithList);
+      });
+
+      state.lists[currentListId] = target;
+      setListsState(state);
+
+      try {
+        await appendRowsToAppsScript(addedRows);
+        const message = `${addedRows.length} row(s) saved successfully to List No. ${currentListId}.`;
+        statusEl.textContent = message;
+        statusEl.className = 'status success';
+        showSuccessPopup(message);
+      } catch (err) {
+        statusEl.textContent = `${addedRows.length} row(s) saved locally, but not saved to Google Sheet: ${err.message}`;
+        statusEl.className = 'status error';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderSelectedRows(rows, listId, source) {
+      selectedTbody.innerHTML = '';
+      selectedTable.hidden = true;
+      downloadBtn.disabled = true;
+      loadedListRows = [];
+
+      if (!rows.length) {
+        listStatus.textContent = `No saved rows found for List No. ${listId}.`;
+        listStatus.className = 'status muted';
+        return;
+      }
+
+      rows.forEach(row => {
+        const tr = document.createElement('tr');
+        const listTd = document.createElement('td');
+        listTd.textContent = row['List No.'];
+        tr.appendChild(listTd);
+
+        REQUIRED_HEADERS.forEach(header => {
+          const td = document.createElement('td');
+          td.textContent = row[header] ?? '';
+          tr.appendChild(td);
+        });
+
+        selectedTbody.appendChild(tr);
+      });
+
+      loadedListRows = rows;
+      selectedTable.hidden = false;
+      downloadBtn.disabled = false;
+      listStatus.textContent = `Loaded ${rows.length} row(s) for List No. ${listId} from ${source}.`;
+      listStatus.className = 'status success';
+    }
+
+    async function loadList() {
+      const listId = Number(downloadListIdInput.value);
+      if (!listId || listId < 1) {
+        listStatus.textContent = 'Enter a valid List ID (1 or greater).';
+        listStatus.className = 'status error';
+        return;
+      }
+
+      setLoading(true, 'Loading selected rows...');
+      try {
+        const data = await callAppsScriptJsonp({ action: 'getList', listId });
+        renderSelectedRows(data.rows || [], listId, 'Google Sheet');
+        downloadStatus.textContent = '';
+      } catch (err) {
+        downloadStatus.textContent = `Google Sheet load failed, using local data: ${err.message}`;
+        downloadStatus.className = 'status error';
+        const localRows = getListsState().lists[listId] || [];
+        renderSelectedRows(localRows, listId, 'this browser');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function downloadList() {
+      if (!loadedListRows.length) return;
+      setLoading(true, 'Preparing Excel download...');
+      const headers = ['List No.', ...REQUIRED_HEADERS];
+      const worksheet = XLSX.utils.json_to_sheet(loadedListRows, { header: headers });
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'SelectedRows');
+      const listId = loadedListRows[0]['List No.'];
+      XLSX.writeFile(workbook, `selected_list_${listId}.xlsx`);
+      downloadStatus.textContent = `Downloaded List No. ${listId}.`;
+      downloadStatus.className = 'status success';
+      setLoading(false);
+    }
+
+    titleEl.textContent = getTodayTitle();
+    createListBtn.addEventListener('click', createNewList);
+    newListBtn.addEventListener('click', createNewList);
+    searchBtn.addEventListener('click', searchRows);
+    machineInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchRows(); });
+    addSelectedBtn.addEventListener('click', addSelectedToCurrentList);
+    loadListBtn.addEventListener('click', loadList);
+    downloadBtn.addEventListener('click', downloadList);
+  </script>
+</body>
+</html>
