@@ -32,9 +32,9 @@
 
   <div class="row">
     <label for="scriptUrl"><strong>Apps Script Web App URL for saving to Google Sheet:</strong></label><br />
-    <input id="scriptUrl" type="text" placeholder="Paste URL ending with /exec, not the spreadsheet URL" style="width: 620px;" />
+    <input id="scriptUrl" type="text" placeholder="Default Apps Script URL is already built in" style="width: 620px;" />
     <button id="saveScriptUrlBtn">Save URL</button>
-    <div id="scriptUrlStatus" class="muted">Use the deployed Apps Script Web App URL. A normal docs.google.com spreadsheet URL cannot save rows.</div>
+    <div id="scriptUrlStatus" class="muted">Default Apps Script Web App URL is built in. Change and save only if you deploy a new Web App.</div>
   </div>
 
   <div class="tab-buttons">
@@ -89,6 +89,7 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script>
     const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AjPYajbXUv9C9JJenKhs-1GyCJuBO6LstQuOjKk6rjw2ZkwajVecJgoDGmENzXJ-JQ/exec';
     const REQUIRED_HEADERS = ['DATE', 'Location', 'Engineer Name', 'Workshop/Onsite', 'Call Type', 'primary / secondary Engineer', 'Camplaint', 'Customer Name', 'Machine No.', 'HMR', 'Brekdown status', "Site's Location", 'call id'];
 
     const titleEl = document.getElementById('title');
@@ -136,7 +137,9 @@
     }
 
     function getScriptUrl() {
-      return localStorage.getItem('selectedRowsScriptUrl') || '';
+      const savedUrl = localStorage.getItem('selectedRowsScriptUrl') || '';
+      if (savedUrl && !isSpreadsheetUrl(savedUrl) && isAppsScriptUrl(savedUrl)) return savedUrl;
+      return DEFAULT_APPS_SCRIPT_URL;
     }
 
     function isSpreadsheetUrl(url) {
@@ -148,10 +151,10 @@
     }
 
     function validateScriptUrl(url) {
-      if (!url) return { ok: false, message: 'Paste the Apps Script Web App URL first.' };
+      if (!url) return { ok: false, message: 'Apps Script Web App URL is missing.' };
       if (isSpreadsheetUrl(url)) return { ok: false, message: 'This is the spreadsheet URL. Please deploy Apps Script and paste the Web App URL ending with /exec.' };
       if (!isAppsScriptUrl(url)) return { ok: false, message: 'Invalid URL. Paste the Apps Script Web App URL from Deploy > Web app. It should normally start with https://script.google.com/macros/s/ and end with /exec.' };
-      return { ok: true, message: 'Apps Script URL saved.' };
+      return { ok: true, message: 'Apps Script URL is ready.' };
     }
 
     function saveScriptUrl() {
@@ -336,7 +339,7 @@
       setListsState(state);
       currentListId = id;
       currentListInfo.textContent = `Current List No: ${id}`;
-      if (!scriptUrl) listStatus.textContent = `Created local List No. ${id}. Add Apps Script URL for shared Google Sheet saving.`;
+      if (!scriptUrl) listStatus.textContent = `Created local List No. ${id}. Apps Script URL is missing, so shared Google Sheet saving is disabled.`;
     }
 
     async function searchRows() {
