@@ -418,10 +418,16 @@
       });
     }
 
-    function appendRowsToAppsScript(rows) {
-      return callAppsScriptJsonp({
-        action: 'appendSelectedRows',
-        payload: JSON.stringify({ rows })
+    async function appendRowsToAppsScript(rows) {
+      const scriptUrl = getScriptUrl();
+      const validation = validateScriptUrl(scriptUrl);
+      if (!validation.ok) throw new Error(validation.message);
+
+      await fetch(scriptUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'appendSelectedRows', rows })
       });
     }
 
