@@ -28,6 +28,11 @@ function doGet(e) {
     return sendJson(getListRows_(e.parameter.listId), e.parameter.callback);
   }
 
+  if (action === 'appendSelectedRows') {
+    const payload = JSON.parse(e.parameter.payload || '{}');
+    return sendJson(appendSelectedRows_(payload.rows || []), e.parameter.callback);
+  }
+
   return sendJson({ ok: false, error: 'Unknown action.' }, e.parameter.callback);
 }
 

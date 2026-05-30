@@ -418,49 +418,15 @@
       });
     }
 
-    function postRowsToAppsScript(rows) {
-      const scriptUrl = getScriptUrl();
-      const validation = validateScriptUrl(scriptUrl);
-      if (!validation.ok) return Promise.reject(new Error(validation.message));
-
-      return new Promise((resolve, reject) => {
-        const iframeName = `appsScriptPostFrame_${Date.now()}`;
-        const iframe = document.createElement('iframe');
-        iframe.name = iframeName;
-        iframe.style.display = 'none';
-
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = scriptUrl;
-        form.target = iframeName;
-        form.style.display = 'none';
-
-        const payloadInput = document.createElement('input');
-        payloadInput.type = 'hidden';
-        payloadInput.name = 'payload';
-        payloadInput.value = JSON.stringify({ action: 'appendSelectedRows', rows });
-        form.appendChild(payloadInput);
-
-        const timeout = setTimeout(() => {
-          cleanup();
-          reject(new Error('Apps Script save timed out. Check Web App deployment permissions.'));
-        }, 15000);
-
-        function cleanup() {
-          clearTimeout(timeout);
-          iframe.remove();
-          form.remove();
-        }
-
-        iframe.onload = () => {
-          cleanup();
-          resolve(true);
-        };
-
-        document.body.appendChild(iframe);
-        document.body.appendChild(form);
-        form.submit();
+    function appendRowsToAppsScript(rows) {
+      return callAppsScriptJsonp({
+        action: 'appendSelectedRows',
+        payload: JSON.stringify({ rows })
       });
+    }
+
+    function showSuccessPopup(message) {
+      window.alert(message);
     }
 
     async function createNewList() {
@@ -574,9 +540,11 @@
       setListsState(state);
 
       try {
-        await postRowsToAppsScript(addedRows);
-        statusEl.textContent = `${addedRows.length} row(s) saved to Google Sheet tab "Selected Rows" for List No. ${currentListId}.`;
+        await appendRowsToAppsScript(addedRows);
+        const message = `${addedRows.length} row(s) saved successfully to List No. ${currentListId}.`;
+        statusEl.textContent = message;
         statusEl.className = 'status success';
+        showSuccessPopup(message);
       } catch (err) {
         statusEl.textContent = `${addedRows.length} row(s) saved locally, but not saved to Google Sheet: ${err.message}`;
         statusEl.className = 'status error';
