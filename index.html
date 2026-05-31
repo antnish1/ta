@@ -1,0 +1,1019 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TA/DA List Builder</title>
+  <style>
+    :root {
+      --bg: #d7dce3;
+      --card: #ffffff;
+      --section-search: #fffdf2;
+      --section-list: #f2f8ff;
+      --text: #172033;
+      --muted: #667085;
+      --border: #d9dee8;
+      --accent: #f7c600;
+      --accent-dark: #d9aa00;
+      --success: #16803c;
+      --danger: #b42318;
+      --disabled: #f1f3f6;
+      --duplicate: #fff2cc;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #d7dce3; color: var(--text); font-family: Arial, sans-serif; min-height: 100vh; }
+    .page-shell { max-width: 1220px; margin: 0 auto; padding: 24px; }
+    .header { margin-bottom: 22px; }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 32px; }
+    h2 { font-size: 24px; margin-bottom: 8px; }
+    h3 { font-size: 18px; margin-bottom: 10px; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .success-text { color: var(--success); }
+    .error-text { color: var(--danger); }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07); padding: 22px; margin-bottom: 18px; }
+    .landing .card { background: linear-gradient(135deg, #ffffff 0%, #fff7cc 100%); }
+    .search-card { background: var(--section-search); border-color: #f2d36b; }
+    .list-card { background: var(--section-list); border-color: #bfd7ff; }
+    .landing { min-height: 58vh; display: grid; place-items: center; }
+    .landing .card { width: 100%; max-width: 560px; }
+    .app-page[hidden], .landing[hidden], table[hidden] { display: none; }
+    .toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+    .badge { display: inline-flex; gap: 8px; align-items: center; background: #fff8d6; border: 1px solid #f3d35b; border-radius: 999px; padding: 8px 14px; font-weight: 700; }
+
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; align-items: end; }
+    .form-row { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; }
+    label { display: block; font-weight: 700; margin-bottom: 6px; }
+    input, select { width: 100%; border: 1px solid var(--border); border-radius: 10px; font-size: 16px; padding: 11px 12px; background: #fff; }
+    input[readonly] { background: #f8fafc; color: #475467; }
+
+    button { border: 0; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 700; padding: 9px 12px; transition: 0.15s ease; }
+    button:disabled { cursor: not-allowed; opacity: 0.7; }
+    .btn-primary { background: var(--accent); color: #1f2937; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
+    .btn-secondary { background: #e9eef8; color: #172033; }
+    .btn-new-list { background: #1f2937; color: #fff; box-shadow: 0 4px 10px rgba(31, 41, 55, 0.22); }
+    .btn-new-list:hover:not(:disabled) { background: #111827; }
+    .btn-success { background: var(--success); color: #fff; }
+    .btn-danger { background: #d92d20; color: #fff; }
+    .btn-danger:hover:not(:disabled), .btn-close:hover:not(:disabled) { background: #b42318; }
+    .btn-close { background: #fee4e2; color: var(--danger); border: 1px solid #fda29b; }
+    .btn-add, .btn-added, .btn-duplicate { width: 30px; height: 30px; min-width: 30px; padding: 0; border-radius: 6px; font-size: 18px; line-height: 30px; text-align: center; }
+    .btn-add { background: var(--accent); color: #172033; }
+    .btn-added { background: #dcfce7; color: #166534; }
+    .btn-duplicate { background: #e5e7eb; color: #475467; }
+
+    .status { margin-top: 12px; min-height: 20px; }
+    .table-wrap { overflow-x: auto; margin-top: 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
+    table { border-collapse: collapse; width: 100%; min-width: 1160px; background: #fff; }
+    th, td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
+    th { background: #f8fafc; font-weight: 800; }
+    tr:last-child td { border-bottom: 0; }
+    th:last-child, td:last-child { border-right: 0; }
+    tr.duplicate-row { background: var(--duplicate); color: #6b4e00; }
+    tr.added-row { background: #ecfdf3; }
+    .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
+    .total-box { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+    .total-box strong { display: block; margin-top: 6px; font-size: 20px; }
+
+    .loader-overlay { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(244, 245, 247, 0.76); z-index: 999; }
+    .loader-overlay.active { display: flex; }
+    .loader-box { display: flex; gap: 14px; align-items: center; background: #fff; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18); padding: 18px 22px; font-weight: 800; }
+    .spinner { width: 30px; height: 30px; border: 4px solid #fff0a8; border-top-color: var(--accent-dark); border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .modal-backdrop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.62); backdrop-filter: blur(3px); z-index: 1000; padding: 16px; }
+    .modal-backdrop.active { display: flex; }
+    .modal { width: min(720px, 100%); max-height: 92vh; overflow-y: auto; background: linear-gradient(135deg, #ffffff 0%, #fff9db 100%); border: 1px solid #f2d36b; border-radius: 22px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35); padding: 24px; }
+    .modal-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin: -24px -24px 18px; padding: 18px 22px; background: linear-gradient(90deg, #f7c600, #ffe680); border-radius: 22px 22px 0 0; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .detail-item { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
+    .detail-item span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+    .toast-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 1100; display: grid; gap: 10px; }
+    .toast { background: #172033; color: #fff; border-radius: 12px; padding: 12px 16px; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22); }
+    .footer { color: var(--muted); font-size: 13px; text-align: center; padding: 18px 0 4px; }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+
+    @media (max-width: 720px) {
+      .page-shell { padding: 14px; }
+      h1 { font-size: 25px; }
+      .card { padding: 16px; }
+      .toolbar { align-items: stretch; }
+      .toolbar button, .toolbar .badge { width: 100%; justify-content: center; }
+      .form-row { flex-wrap: nowrap; }
+      .form-row > div { min-width: 0 !important; }
+      #searchBtn { flex: 0 0 96px; }
+      #printBtn, #downloadBtn { flex: 1 1 0; width: auto; }
+      #searchBtn { width: auto; }
+      .modal-actions { flex-direction: row; }
+      .modal-actions button { width: auto; flex: 1; }
+    }
+  </style>
+</head>
+<body>
+  <div id="loaderOverlay" class="loader-overlay" aria-live="polite" aria-busy="true">
+    <div class="loader-box"><span class="spinner"></span><span id="loaderText">Loading...</span></div>
+  </div>
+  <div id="toastWrap" class="toast-wrap"></div>
+
+  <main class="page-shell">
+    <header class="header">
+      <h1>TA-DA Calculation System</h1>
+      <p class="muted">Frontier Commercial Vehicle Pvt. Ltd.</p>
+    </header>
+
+    <section id="landingPage" class="landing">
+      <div class="card">
+        <h2>Create New List</h2>
+        <div class="form-grid">
+          <div>
+            <label for="preparedBy">Prepared By</label>
+            <select id="preparedBy">
+              <option value="">Select user</option>
+              <option value="Ankita Tiwari">Ankita Tiwari</option>
+              <option value="Ashish Upadhyay">Ashish Upadhyay</option>
+            </select>
+          </div>
+          <button id="createListBtn" class="btn-primary">Create List</button>
+        </div>
+        <div id="landingStatus" class="status muted"></div>
+        <hr style="border:0;border-top:1px solid var(--border);margin:22px 0;" />
+        <h3>View Previous List</h3>
+        <div class="form-row">
+          <div style="min-width:180px;flex:1;">
+            <label for="previousListNo">List No.</label>
+            <input id="previousListNo" type="number" min="1" placeholder="Enter List No." />
+          </div>
+          <button id="viewPreviousListBtn" class="btn-secondary">View List</button>
+        </div>
+        <div id="previousListStatus" class="status muted"></div>
+      </div>
+    </section>
+
+    <section id="appPage" class="app-page" hidden>
+      <div class="toolbar">
+        <span id="currentListInfo" class="badge">No active list</span>
+        <button id="newListBtn" class="btn-new-list">Create Another List</button>
+      </div>
+
+      <section class="card search-card">
+        <h2>Search Machine Number</h2>
+        <div class="form-row">
+          <div style="min-width:260px; flex:1;">
+            <label for="machineNo">Machine No.</label>
+            <input id="machineNo" type="text" placeholder="Example: 3460308" />
+          </div>
+          <button id="searchBtn" class="btn-primary">Search</button>
+        </div>
+        <div id="status" class="status muted"></div>
+        <div class="table-wrap">
+          <table id="resultTable" hidden>
+            <thead>
+              <tr>
+                <th>Action</th><th>DATE</th><th>Site's Location</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card list-card">
+        <div class="toolbar">
+          <div>
+            <h2>Current List</h2>
+          </div>
+          <div class="form-row">
+            <button id="printBtn" class="btn-secondary" disabled>Print List</button>
+            <button id="downloadBtn" class="btn-primary" disabled>Download Excel</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table id="currentListTable" hidden>
+            <thead>
+              <tr>
+                <th>S.No.</th><th>Date</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Site's Location</th><th>Total KM</th><th>TA Amt.</th><th>DA Amount</th><th>Hotel Charges</th><th>Total TA + DA</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="emptyListMessage" class="status muted">No rows added yet.</div>
+        <div class="totals">
+          <div class="total-box">Total TA<strong id="totalTa">0.00</strong></div>
+          <div class="total-box">Total DA<strong id="totalDa">0.00</strong></div>
+          <div class="total-box">Grand Total TA + DA<strong id="grandTotal">0.00</strong></div>
+        </div>
+      </section>
+    </section>
+    <footer class="footer">Designed By - Nishant Mishra</footer>
+  </main>
+
+  <div id="rowModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <h2 id="modalTitle">Add Row to Current List</h2>
+          <p class="muted">Confirm call details and enter TA/DA information.</p>
+        </div>
+        <button id="closeModalBtn" class="btn-close" type="button">Close</button>
+      </div>
+      <div id="modalDetails" class="detail-grid"></div>
+      <div class="form-grid">
+        <div>
+          <label for="siteLocationInput">Site's Location</label>
+          <input id="siteLocationInput" type="text" placeholder="Enter site location" />
+        </div>
+        <div>
+          <label for="totalKmInput">Total KM *</label>
+          <input id="totalKmInput" type="number" min="0" step="0.01" placeholder="Enter KM" />
+        </div>
+        <div>
+          <label for="totalTaInput">TA Amt.</label>
+          <input id="totalTaInput" type="text" readonly />
+        </div>
+        <div>
+          <label for="daTypeInput">DA Type</label>
+          <select id="daTypeInput">
+            <option value="">No DA</option>
+            <option value="Half">Half</option>
+            <option value="Full">Full</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="daAmountInput">DA Amount</label>
+          <input id="daAmountInput" type="number" min="0" step="1" readonly />
+        </div>
+        <div>
+          <label for="hotelChargesInput">Hotel Charges</label>
+          <input id="hotelChargesInput" type="number" min="0" step="1" placeholder="Optional" />
+        </div>
+        <div>
+          <label for="totalTaDaInput">Total TA + DA</label>
+          <input id="totalTaDaInput" type="text" readonly />
+        </div>
+      </div>
+      <div id="modalError" class="status error-text"></div>
+      <div class="modal-actions">
+        <button id="cancelModalBtn" class="btn-danger" type="button">Cancel</button>
+        <button id="saveModalBtn" class="btn-primary" type="button" disabled>Save Row</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1lXW_K5pN7kU4hThZI2u-5zWmnZFpvpjd0Xy9bvbcFhE/export?format=csv&gid=0';
+    const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AjPYajbXUv9C9JJenKhs-1GyCJuBO6LstQuOjKk6rjw2ZkwajVecJgoDGmENzXJ-JQ/exec';
+    const XLSX_CDN_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    const TA_RATE = 3.15;
+    const LIST_HEADERS = ['S.No.', 'Date', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', "Site's Location", 'Total KM', 'TA Amt.', 'DA Amount', 'Hotel Charges', 'Total TA + DA'];
+
+    const landingPage = document.getElementById('landingPage');
+    const appPage = document.getElementById('appPage');
+    const preparedByInput = document.getElementById('preparedBy');
+    const previousListNoInput = document.getElementById('previousListNo');
+    const viewPreviousListBtn = document.getElementById('viewPreviousListBtn');
+    const previousListStatus = document.getElementById('previousListStatus');
+    const createListBtn = document.getElementById('createListBtn');
+    const newListBtn = document.getElementById('newListBtn');
+    const currentListInfo = document.getElementById('currentListInfo');
+    const machineInput = document.getElementById('machineNo');
+    const searchBtn = document.getElementById('searchBtn');
+    const statusEl = document.getElementById('status');
+    const resultTable = document.getElementById('resultTable');
+    const resultTbody = resultTable.querySelector('tbody');
+    const currentListTable = document.getElementById('currentListTable');
+    const currentListTbody = currentListTable.querySelector('tbody');
+    const emptyListMessage = document.getElementById('emptyListMessage');
+    const totalTaEl = document.getElementById('totalTa');
+    const totalDaEl = document.getElementById('totalDa');
+    const grandTotalEl = document.getElementById('grandTotal');
+    const printBtn = document.getElementById('printBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const loaderOverlay = document.getElementById('loaderOverlay');
+    const loaderText = document.getElementById('loaderText');
+    const landingStatus = document.getElementById('landingStatus');
+    const toastWrap = document.getElementById('toastWrap');
+    const rowModal = document.getElementById('rowModal');
+    const modalDetails = document.getElementById('modalDetails');
+    const closeModalBtn = document.getElementById('closeModalBtn');
+    const cancelModalBtn = document.getElementById('cancelModalBtn');
+    const saveModalBtn = document.getElementById('saveModalBtn');
+    const siteLocationInput = document.getElementById('siteLocationInput');
+    const totalKmInput = document.getElementById('totalKmInput');
+    const totalTaInput = document.getElementById('totalTaInput');
+    const daTypeInput = document.getElementById('daTypeInput');
+    const daAmountInput = document.getElementById('daAmountInput');
+    const hotelChargesInput = document.getElementById('hotelChargesInput');
+    const totalTaDaInput = document.getElementById('totalTaDaInput');
+    const modalError = document.getElementById('modalError');
+
+    let currentListId = null;
+    let currentPreparedBy = '';
+    let searchRowsCache = [];
+    let currentListRows = [];
+    let selectedModalRow = null;
+    let listSyncPromise = null;
+    let xlsxLoadPromise = null;
+
+    function setLoading(isLoading, message = 'Loading...') {
+      loaderText.textContent = message;
+      loaderOverlay.classList.toggle('active', isLoading);
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      toastWrap.appendChild(toast);
+      setTimeout(() => toast.remove(), 3200);
+    }
+
+    function todayDisplay() {
+      const today = new Date();
+      return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
+    }
+
+    function formatAmount(value) {
+      return String(Math.round(Number(value || 0)));
+    }
+
+    function getScriptUrl() {
+      const savedUrl = localStorage.getItem('selectedRowsScriptUrl') || '';
+      if (savedUrl && !savedUrl.includes('docs.google.com/spreadsheets') && isAppsScriptUrl(savedUrl)) return savedUrl;
+      return DEFAULT_APPS_SCRIPT_URL;
+    }
+
+    function isAppsScriptUrl(url) {
+      return /^https:\/\/script\.google\.com\/macros\/s\/.+\/exec$/.test(url) || /^https:\/\/script\.googleusercontent\.com\//.test(url);
+    }
+
+    function callAppsScriptJsonp(params) {
+      const scriptUrl = getScriptUrl();
+      return new Promise((resolve, reject) => {
+        const callbackName = `appsScriptCallback_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+        const script = document.createElement('script');
+        const query = new URLSearchParams({ ...params, callback: callbackName });
+        const timeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Apps Script did not respond.'));
+        }, 8000);
+
+        function cleanup() {
+          clearTimeout(timeout);
+          delete window[callbackName];
+          script.remove();
+        }
+
+        window[callbackName] = data => {
+          cleanup();
+          if (data && data.ok === false) reject(data);
+          else resolve(data);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Could not reach Apps Script Web App.'));
+        };
+
+        script.src = `${scriptUrl}?${query.toString()}`;
+        document.body.appendChild(script);
+      });
+    }
+
+    function getListsState() {
+      return JSON.parse(localStorage.getItem('machineListsState') || '{"nextListId":1,"lists":{},"rowKeys":{}}');
+    }
+
+    function setListsState(state) {
+      localStorage.setItem('machineListsState', JSON.stringify(state));
+    }
+
+    function cleanHeader(value) {
+      return String(value ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/[.]/g, '').trim();
+    }
+
+    function formatDateValue(value) {
+      if (value === null || value === undefined) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+      const numeric = Number(text);
+      if (!Number.isNaN(numeric) && /^\d+(\.\d+)?$/.test(text)) {
+        const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+        const parsedDate = new Date(excelEpoch.getTime() + Math.floor(numeric) * 86400000);
+        return `${String(parsedDate.getUTCDate()).padStart(2, '0')}/${String(parsedDate.getUTCMonth() + 1).padStart(2, '0')}/${parsedDate.getUTCFullYear()}`;
+      }
+      const parts = text.split(/[\/-]/).map(part => part.trim());
+      if (parts.length === 3 && parts[2].length === 4) return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+      const jsDate = new Date(text);
+      if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
+      return text;
+    }
+
+    function parseDisplayDateForSort(value) {
+      const parts = String(value || '').split('/').map(Number);
+      if (parts.length === 3 && parts.every(part => !Number.isNaN(part))) {
+        return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+      const parsed = new Date(value).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    }
+
+    function findHeaderRowIndex(rows2d) {
+      return rows2d.findIndex(row => row.some(cell => cleanHeader(cell).includes('machine no')));
+    }
+
+    function mapHeadersToIndex(headerRow) {
+      const map = {};
+      headerRow.forEach((header, index) => {
+        const key = cleanHeader(header);
+        if (key) map[key] = index;
+      });
+      return map;
+    }
+
+    function pick(row, headerMap, aliases) {
+      for (const alias of aliases) {
+        const index = headerMap[cleanHeader(alias)];
+        if (index !== undefined) return row[index] ?? '';
+      }
+      return '';
+    }
+
+    function buildRowKey(row) {
+      return [row.DATE, row['Engineer Name'], row['Machine No.']].map(value => String(value || '').trim().toLowerCase()).join('|');
+    }
+
+    function parseCsvRows(csvText) {
+      const rows = [];
+      let row = [];
+      let value = '';
+      let inQuotes = false;
+
+      for (let i = 0; i < csvText.length; i += 1) {
+        const char = csvText[i];
+        const next = csvText[i + 1];
+
+        if (char === '"' && inQuotes && next === '"') {
+          value += '"';
+          i += 1;
+        } else if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === ',' && !inQuotes) {
+          row.push(value);
+          value = '';
+        } else if ((char === '\n' || char === '\r') && !inQuotes) {
+          if (char === '\r' && next === '\n') i += 1;
+          row.push(value);
+          rows.push(row);
+          row = [];
+          value = '';
+        } else {
+          value += char;
+        }
+      }
+
+      if (value || row.length) {
+        row.push(value);
+        rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function parseRows(csvText) {
+      const rows2d = parseCsvRows(csvText);
+      const headerIndex = findHeaderRowIndex(rows2d);
+      if (headerIndex === -1) throw new Error('Header row not found in sheet.');
+      const headerMap = mapHeadersToIndex(rows2d[headerIndex]);
+      const dataRows = rows2d.slice(headerIndex + 1).filter(row => row.some(value => String(value).trim() !== ''));
+
+      return dataRows.map(row => {
+        const parsed = {
+          DATE: formatDateValue(pick(row, headerMap, ['Date', 'DATE', 'Entry Date'])),
+          Location: pick(row, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+          "Site's Location": pick(row, headerMap, ["Site's Location", 'Site Location', 'Target Place', 'Location', 'Branch']),
+          'Engineer Name': pick(row, headerMap, ['Engineer Name', 'Name']),
+          'Workshop/Onsite': pick(row, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
+          'Call Type': pick(row, headerMap, ['Call Type', 'Type of Call']),
+          Complaint: pick(row, headerMap, ['Complaint', 'Camplaint']),
+          'Customer Name': pick(row, headerMap, ['Customer Name', 'Customer']),
+          'Machine No.': pick(row, headerMap, ['Machine No.', 'Machine No', 'Machine Number']),
+          'Call ID': pick(row, headerMap, ['Call ID', 'call id']),
+          'Labour Charge': pick(row, headerMap, ['Labour Charge', 'Labor Charge', 'Labour', 'Labor'])
+        };
+        parsed.RowKey = buildRowKey(parsed);
+        return parsed;
+      });
+    }
+
+    function localExistingMap(rowKeys) {
+      const state = getListsState();
+      const result = {};
+      Object.entries(state.rowKeys || {}).forEach(([rowKey, listNo]) => {
+        if (!rowKeys || rowKeys.includes(rowKey)) result[rowKey] = listNo;
+      });
+      return result;
+    }
+
+    async function getExistingRows(rowKeys) {
+      try {
+        const data = await callAppsScriptJsonp({ action: 'getExistingRows', payload: JSON.stringify({ rowKeys }) });
+        return data.existing || {};
+      } catch (err) {
+        return localExistingMap(rowKeys);
+      }
+    }
+
+    async function createNewList() {
+      const preparedBy = preparedByInput.value.trim();
+      if (!preparedBy) {
+        landingStatus.textContent = 'Please select Prepared By.';
+        landingStatus.className = 'status error-text';
+        return;
+      }
+
+      const localListId = createLocalList(preparedBy);
+      openList(localListId, preparedBy);
+      showToast(`List No. ${localListId} created. Syncing with Google Sheet...`);
+      listSyncPromise = syncCreatedList(preparedBy, localListId);
+    }
+
+    function createLocalList(preparedBy) {
+      const state = getListsState();
+      const id = state.nextListId;
+      state.nextListId += 1;
+      state.lists[id] = { preparedBy, rows: [] };
+      setListsState(state);
+      return id;
+    }
+
+    async function syncCreatedList(preparedBy, localListId) {
+      try {
+        const data = await callAppsScriptJsonp({ action: 'createList', payload: JSON.stringify({ preparedBy }) });
+        if (!data || !data.listId || String(data.listId) === String(localListId)) {
+          showToast(`List No. ${localListId} is ready.`);
+          return;
+        }
+
+        migrateLocalListId(localListId, data.listId, preparedBy);
+        currentListId = data.listId;
+        currentListInfo.textContent = `List No: ${data.listId} | Prepared By: ${preparedBy}`;
+        showToast(`Google Sheet List No. ${data.listId} is ready.`);
+      } catch (err) {
+        showToast('Google Sheet is slow/unavailable. You can continue with the local list.', 'error');
+      }
+    }
+
+    function migrateLocalListId(oldId, newId, preparedBy) {
+      const state = getListsState();
+      const oldList = state.lists[oldId] || { preparedBy, rows: [] };
+      oldList.rows = (oldList.rows || []).map(row => ({ ...row, 'List No.': newId }));
+      state.lists[newId] = oldList;
+      delete state.lists[oldId];
+      Object.entries(state.rowKeys || {}).forEach(([rowKey, listNo]) => {
+        if (String(listNo) === String(oldId)) state.rowKeys[rowKey] = newId;
+      });
+      setListsState(state);
+      currentListRows = oldList.rows;
+      renderCurrentList();
+    }
+
+
+    function openList(listId, preparedBy) {
+      currentListId = listId;
+      currentPreparedBy = preparedBy;
+      currentListRows = [];
+      currentListInfo.textContent = `List No: ${listId} | Prepared By: ${preparedBy}`;
+      landingPage.hidden = true;
+      appPage.hidden = false;
+      renderCurrentList();
+      machineInput.focus();
+    }
+
+    function normalizeListItem(row) {
+      return {
+        ...row,
+        Date: row.Date || row['Entry Date'] || row.DATE || '',
+        "Site's Location": row["Site's Location"] || row['Site Location'] || row.Location || '',
+        'TA Amt.': row['TA Amt.'] || row['Total TA'] || '0',
+        'Hotel Charges': row['Hotel Charges'] || row['Hotel Charge'] || '0',
+        'Total TA + DA': row['Total TA + DA'] || '0'
+      };
+    }
+
+    function openExistingList(listId, preparedBy, rows) {
+      currentListId = listId;
+      currentPreparedBy = preparedBy || '';
+      currentListRows = (rows || []).map(normalizeListItem);
+      currentListInfo.textContent = `List No: ${listId} | Prepared By: ${currentPreparedBy || '-'}`;
+      landingPage.hidden = true;
+      appPage.hidden = false;
+      renderCurrentList();
+      machineInput.focus();
+    }
+
+    async function loadPreviousList() {
+      const listId = previousListNoInput.value.trim();
+      if (!listId) {
+        previousListStatus.textContent = 'Please enter a List No.';
+        previousListStatus.className = 'status error-text';
+        return;
+      }
+
+      setLoading(true, 'Loading previous list...');
+      previousListStatus.textContent = '';
+      try {
+        const data = await callAppsScriptJsonp({ action: 'getList', listId });
+        if (!data.rows || data.rows.length === 0) {
+          previousListStatus.textContent = `No rows found for List No. ${listId}.`;
+          previousListStatus.className = 'status error-text';
+          return;
+        }
+        openExistingList(listId, data.preparedBy, data.rows);
+        showToast(`List No. ${listId} loaded.`);
+      } catch (err) {
+        const localList = getListsState().lists[listId];
+        if (localList) {
+          openExistingList(listId, localList.preparedBy, localList.rows || []);
+          showToast(`Loaded local List No. ${listId}.`, 'error');
+        } else {
+          previousListStatus.textContent = `Could not load List No. ${listId}.`;
+          previousListStatus.className = 'status error-text';
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function searchRows() {
+      const machineNo = machineInput.value.trim();
+      if (!machineNo) {
+        statusEl.textContent = 'Please enter a Machine No.';
+        statusEl.className = 'status error-text';
+        return;
+      }
+
+      setLoading(true, 'Searching...');
+      resultTable.hidden = true;
+      resultTbody.innerHTML = '';
+      statusEl.textContent = '';
+      statusEl.className = 'status muted';
+
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        if (!res.ok) throw new Error('Could not fetch Google Sheet data.');
+        const rows = parseRows(await res.text())
+          .filter(row => String(row['Machine No.']).trim() === machineNo)
+          .sort((a, b) => parseDisplayDateForSort(b.DATE) - parseDisplayDateForSort(a.DATE));
+        const existing = await getExistingRows(rows.map(row => row.RowKey));
+        const currentKeys = new Set(currentListRows.map(row => row.RowKey));
+
+        searchRowsCache = rows.map(row => ({
+          ...row,
+          existingListNo: existing[row.RowKey] || null,
+          addedToCurrent: currentKeys.has(row.RowKey)
+        }));
+
+        if (!searchRowsCache.length) {
+          statusEl.textContent = `No rows found for Machine No. ${machineNo}.`;
+          statusEl.className = 'status muted';
+          return;
+        }
+
+        renderSearchRows();
+        statusEl.textContent = `${searchRowsCache.length} row(s) found.`;
+        statusEl.className = 'status success-text';
+      } catch (err) {
+        statusEl.textContent = `Search failed: ${err.message}`;
+        statusEl.className = 'status error-text';
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function renderSearchRows() {
+      resultTbody.innerHTML = '';
+      searchRowsCache.forEach((row, index) => {
+        const tr = document.createElement('tr');
+        const actionTd = document.createElement('td');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+
+        if (row.addedToCurrent) {
+          tr.className = 'added-row';
+          btn.className = 'btn-added';
+          btn.textContent = '✓';
+          btn.disabled = true;
+        } else if (row.existingListNo) {
+          tr.className = 'duplicate-row';
+          btn.className = 'btn-duplicate';
+          btn.textContent = '✓';
+          btn.disabled = true;
+        } else {
+          btn.className = 'btn-add';
+          btn.textContent = '+';
+          btn.addEventListener('click', () => openRowModal(index));
+        }
+
+        actionTd.appendChild(btn);
+        tr.appendChild(actionTd);
+        ['DATE', "Site's Location", 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.'].forEach(header => {
+          const td = document.createElement('td');
+          td.textContent = row[header] || '';
+          tr.appendChild(td);
+        });
+        resultTbody.appendChild(tr);
+      });
+      resultTable.hidden = false;
+    }
+
+    function openRowModal(index) {
+      selectedModalRow = searchRowsCache[index];
+      if (String(selectedModalRow['Workshop/Onsite'] || '').trim().toLowerCase() === 'workshop') {
+        window.alert('Workshop call is not eligible for TA-DA');
+        showToast('Workshop call is not eligible for TA-DA.', 'error');
+        selectedModalRow = null;
+        return;
+      }
+      modalDetails.innerHTML = '';
+      [
+        ['Machine No.', selectedModalRow['Machine No.']],
+        ['Customer Name', selectedModalRow['Customer Name']],
+        ['Engineer Name', selectedModalRow['Engineer Name']],
+        ['Call ID', selectedModalRow['Call ID']],
+        ['Complaint', selectedModalRow.Complaint]
+      ].forEach(([label, value]) => {
+        const item = document.createElement('div');
+        item.className = 'detail-item';
+        item.innerHTML = `<span>${label}</span>${value || '-'}`;
+        modalDetails.appendChild(item);
+      });
+      siteLocationInput.value = selectedModalRow["Site's Location"] || '';
+      totalKmInput.value = '';
+      daTypeInput.value = '';
+      daAmountInput.value = '0';
+      hotelChargesInput.value = '';
+      updateModalCalculations();
+      modalError.textContent = '';
+      rowModal.classList.add('active');
+      totalKmInput.focus();
+    }
+
+    function closeModal() {
+      rowModal.classList.remove('active');
+      selectedModalRow = null;
+    }
+
+    function getModalAmounts() {
+      const km = Number(totalKmInput.value);
+      const validKm = totalKmInput.value !== '' && !Number.isNaN(km) && km >= 0;
+      const totalTa = validKm ? Math.round(km * TA_RATE) : 0;
+      const daType = daTypeInput.value;
+      const customDa = Number(daAmountInput.value || 0);
+      const daAmount = daType === 'Half' ? 125 : daType === 'Full' ? 250 : daType === 'Other' ? Math.round(customDa) : 0;
+      const hotelChargesRaw = hotelChargesInput.value === '' ? 0 : Number(hotelChargesInput.value);
+      const validHotel = !Number.isNaN(hotelChargesRaw) && hotelChargesRaw >= 0;
+      const hotelCharges = validHotel ? Math.round(hotelChargesRaw) : 0;
+      return { km, validKm, totalTa, daType, daAmount, hotelCharges, validHotel, totalTaDa: totalTa + daAmount + hotelCharges };
+    }
+
+    function updateModalCalculations() {
+      const amounts = getModalAmounts();
+      const isOtherDa = daTypeInput.value === 'Other';
+      daAmountInput.readOnly = !isOtherDa;
+      if (!isOtherDa) daAmountInput.value = formatAmount(amounts.daAmount);
+      totalTaInput.value = formatAmount(amounts.totalTa);
+      totalTaDaInput.value = formatAmount(amounts.totalTaDa);
+      saveModalBtn.disabled = !amounts.validKm || !amounts.validHotel;
+      if (!amounts.validKm && totalKmInput.value !== '') modalError.textContent = 'Total KM must be greater than or equal to 0.';
+      else if (!amounts.validHotel) modalError.textContent = 'Hotel Charges must be greater than or equal to 0.';
+      else modalError.textContent = '';
+    }
+
+    async function saveModalRow() {
+      if (!selectedModalRow) return;
+      const amounts = getModalAmounts();
+      if (!amounts.validKm) {
+        modalError.textContent = 'Total KM is required and must be greater than or equal to 0.';
+        return;
+      }
+      if (!amounts.validHotel) {
+        modalError.textContent = 'Hotel Charges must be greater than or equal to 0.';
+        return;
+      }
+
+      setLoading(true, 'Saving row...');
+      if (listSyncPromise) await listSyncPromise.catch(() => {});
+
+      const item = {
+        'List No.': currentListId,
+        'Prepared By': currentPreparedBy,
+        RowKey: selectedModalRow.RowKey,
+        'S.No.': currentListRows.length + 1,
+        'Entry Date': selectedModalRow.DATE,
+        Date: selectedModalRow.DATE,
+        'Engineer Name': selectedModalRow['Engineer Name'],
+        'Call Type': selectedModalRow['Call Type'],
+        Complaint: selectedModalRow.Complaint,
+        'Customer Name': selectedModalRow['Customer Name'],
+        'Machine No.': selectedModalRow['Machine No.'],
+        'Call ID': selectedModalRow['Call ID'],
+        'Labour Charge': selectedModalRow['Labour Charge'],
+        "Site's Location": siteLocationInput.value.trim(),
+        'Total KM': formatAmount(amounts.km),
+        'TA Rate': TA_RATE.toFixed(2),
+        'Total TA': formatAmount(amounts.totalTa),
+        'TA Amt.': formatAmount(amounts.totalTa),
+        'DA Type': amounts.daType,
+        'DA Amount': formatAmount(amounts.daAmount),
+        'Hotel Charges': formatAmount(amounts.hotelCharges),
+        'Total TA + DA': formatAmount(amounts.totalTaDa)
+      };
+
+      try {
+        const data = await callAppsScriptJsonp({ action: 'appendListItem', payload: JSON.stringify({ item }) });
+        if (data.duplicate) throw data;
+        addItemLocally(item);
+        markSearchRowAdded(item.RowKey);
+        closeModal();
+        showToast('✓ Row added successfully.');
+      } catch (err) {
+        if (err.duplicate) {
+          markSearchRowDuplicate(item.RowKey, err.existingListNo);
+          closeModal();
+          showToast(`Already added in List No. ${err.existingListNo}.`, 'error');
+        } else {
+          addItemLocally(item);
+          markSearchRowAdded(item.RowKey);
+          closeModal();
+          showToast('Saved locally. Google Sheet save failed.', 'error');
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    function addItemLocally(item) {
+      currentListRows.push(item);
+      const state = getListsState();
+      state.lists[currentListId] = { preparedBy: currentPreparedBy, rows: currentListRows };
+      state.rowKeys = state.rowKeys || {};
+      state.rowKeys[item.RowKey] = currentListId;
+      setListsState(state);
+      renderCurrentList();
+    }
+
+    function markSearchRowAdded(rowKey) {
+      searchRowsCache = searchRowsCache.map(row => row.RowKey === rowKey ? { ...row, addedToCurrent: true } : row);
+      renderSearchRows();
+    }
+
+    function markSearchRowDuplicate(rowKey, listNo) {
+      searchRowsCache = searchRowsCache.map(row => row.RowKey === rowKey ? { ...row, existingListNo: listNo } : row);
+      renderSearchRows();
+    }
+
+    function renderCurrentList() {
+      currentListTbody.innerHTML = '';
+      currentListRows.forEach((row, index) => {
+        row['S.No.'] = index + 1;
+        const tr = document.createElement('tr');
+        LIST_HEADERS.forEach(header => {
+          const td = document.createElement('td');
+          td.textContent = row[header] || '';
+          tr.appendChild(td);
+        });
+        currentListTbody.appendChild(tr);
+      });
+      currentListTable.hidden = currentListRows.length === 0;
+      emptyListMessage.hidden = currentListRows.length > 0;
+      printBtn.disabled = currentListRows.length === 0;
+      downloadBtn.disabled = currentListRows.length === 0;
+      renderTotals();
+    }
+
+    function calculateTotals() {
+      return currentListRows.reduce((totals, row) => {
+        totals.ta += Number(row['TA Amt.'] || row['Total TA'] || 0);
+        totals.da += Number(row['DA Amount'] || 0);
+        totals.grand += Number(row['Total TA + DA'] || 0);
+        return totals;
+      }, { ta: 0, da: 0, grand: 0 });
+    }
+
+    function renderTotals() {
+      const totals = calculateTotals();
+      totalTaEl.textContent = formatAmount(totals.ta);
+      totalDaEl.textContent = formatAmount(totals.da);
+      grandTotalEl.textContent = formatAmount(totals.grand);
+    }
+
+    function buildPrintableHtml() {
+      const rowsHtml = currentListRows.map(row => `<tr>${LIST_HEADERS.map(header => `<td>${row[header] || ''}</td>`).join('')}</tr>`).join('');
+      return `<!doctype html><html><head><title>TA-DA List No. ${currentListId}</title><style>body{font-family:Arial,sans-serif;margin:24px;}h1{display:flex;justify-content:center;align-items:baseline;gap:42px;font-size:20px;margin-bottom:18px;}.print-list-no{font-weight:800;letter-spacing:.3px;}.print-date{font-family:Georgia,serif;font-style:italic;font-weight:600;color:#444;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #333;padding:6px;text-align:left;}th{background:#eee}.sign{display:flex;justify-content:space-between;margin-top:54px;font-weight:bold;}</style></head><body><h1><span class="print-list-no">TA-DA List No. - ${currentListId}</span><span class="print-date">Date : ${todayDisplay()}</span></h1><table><thead><tr>${LIST_HEADERS.map(header => `<th>${header}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><div class="sign"><div>Prepared By: ${currentPreparedBy}</div><div>Posted By: ___________</div></div></body></html>`;
+    }
+
+    function printList() {
+      const win = window.open('', '_blank');
+      win.document.write(buildPrintableHtml());
+      win.document.close();
+      win.focus();
+      win.print();
+    }
+
+    function loadXlsxLibrary() {
+      if (window.XLSX) return Promise.resolve(window.XLSX);
+      if (xlsxLoadPromise) return xlsxLoadPromise;
+
+      xlsxLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        const timeout = setTimeout(() => reject(new Error('Excel library load timed out.')), 8000);
+        script.src = XLSX_CDN_URL;
+        script.onload = () => {
+          clearTimeout(timeout);
+          resolve(window.XLSX);
+        };
+        script.onerror = () => {
+          clearTimeout(timeout);
+          reject(new Error('Excel library could not be loaded.'));
+        };
+        document.head.appendChild(script);
+      });
+
+      return xlsxLoadPromise;
+    }
+
+    function escapeCsvValue(value) {
+      const text = String(value ?? '');
+      return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+    }
+
+    function downloadCsvFallback(aoa) {
+      const csv = aoa.map(row => row.map(escapeCsvValue).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `ta_da_list_${currentListId}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function downloadExcel() {
+      setLoading(true, 'Preparing download...');
+      const aoa = [
+        [`TA-DA List No. - ${currentListId}`, `Date : ${todayDisplay()}`],
+        [],
+        LIST_HEADERS,
+        ...currentListRows.map(row => LIST_HEADERS.map(header => row[header] || '')),
+        [],
+        ['Prepared By:', currentPreparedBy, 'Posted By:', '___________']
+      ];
+
+      try {
+        const xlsx = await loadXlsxLibrary();
+        const worksheet = xlsx.utils.aoa_to_sheet(aoa);
+        const workbook = xlsx.utils.book_new();
+        xlsx.utils.book_append_sheet(workbook, worksheet, 'TA_DA_List');
+        xlsx.writeFile(workbook, `ta_da_list_${currentListId}.xlsx`);
+        showToast('Excel downloaded.');
+      } catch (err) {
+        downloadCsvFallback(aoa);
+        showToast('CSV downloaded because Excel library is unavailable.', 'error');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+
+    createListBtn.addEventListener('click', createNewList);
+    viewPreviousListBtn.addEventListener('click', loadPreviousList);
+    previousListNoInput.addEventListener('keydown', event => { if (event.key === 'Enter') loadPreviousList(); });
+    newListBtn.addEventListener('click', () => {
+      appPage.hidden = true;
+      landingPage.hidden = false;
+      preparedByInput.focus();
+    });
+    searchBtn.addEventListener('click', searchRows);
+    machineInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchRows(); });
+    totalKmInput.addEventListener('input', updateModalCalculations);
+    daTypeInput.addEventListener('change', updateModalCalculations);
+    daAmountInput.addEventListener('input', updateModalCalculations);
+    hotelChargesInput.addEventListener('input', updateModalCalculations);
+    saveModalBtn.addEventListener('click', saveModalRow);
+    closeModalBtn.addEventListener('click', closeModal);
+    cancelModalBtn.addEventListener('click', closeModal);
+    rowModal.addEventListener('click', event => { if (event.target === rowModal) closeModal(); });
+    printBtn.addEventListener('click', printList);
+    downloadBtn.addEventListener('click', downloadExcel);
+  </script>
+</body>
+</html>
