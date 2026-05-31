@@ -84,6 +84,7 @@
     .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
     .toast-wrap { position: fixed; right: 18px; bottom: 18px; z-index: 1100; display: grid; gap: 10px; }
     .toast { background: #172033; color: #fff; border-radius: 12px; padding: 12px 16px; box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22); }
+    .footer { color: var(--muted); font-size: 13px; text-align: center; padding: 18px 0 4px; }
     .toast.success { background: var(--success); }
     .toast.error { background: var(--danger); }
 
@@ -106,26 +107,35 @@
 
   <main class="page-shell">
     <header class="header">
-      <h1 id="title">TA/DA List</h1>
-      <p class="muted">Search machine rows, add selected calls to a TA/DA list, then print or download.</p>
+      <h1>TA-DA Calculation System</h1>
+      <p class="muted">Frontier Commercial Vehicle Pvt. Ltd.</p>
     </header>
 
     <section id="landingPage" class="landing">
       <div class="card">
         <h2>Create New List</h2>
-        <p class="muted">Select who prepared this list. No login is required.</p>
         <div class="form-grid">
           <div>
             <label for="preparedBy">Prepared By</label>
             <select id="preparedBy">
               <option value="">Select user</option>
-              <option value="User 1">User 1</option>
-              <option value="User 2">User 2</option>
+              <option value="Ankita Tiwari">Ankita Tiwari</option>
+              <option value="Ashish Upadhyay">Ashish Upadhyay</option>
             </select>
           </div>
           <button id="createListBtn" class="btn-primary">Create List</button>
         </div>
         <div id="landingStatus" class="status muted"></div>
+        <hr style="border:0;border-top:1px solid var(--border);margin:22px 0;" />
+        <h3>View Previous List</h3>
+        <div class="form-row">
+          <div style="min-width:180px;flex:1;">
+            <label for="previousListNo">List No.</label>
+            <input id="previousListNo" type="number" min="1" placeholder="Enter List No." />
+          </div>
+          <button id="viewPreviousListBtn" class="btn-secondary">View List</button>
+        </div>
+        <div id="previousListStatus" class="status muted"></div>
       </div>
     </section>
 
@@ -150,7 +160,7 @@
           <table id="resultTable" hidden>
             <thead>
               <tr>
-                <th>Action</th><th>DATE</th><th>Location</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Call ID</th><th>Labour Charge</th>
+                <th>Action</th><th>DATE</th><th>Site's Location</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -173,7 +183,7 @@
           <table id="currentListTable" hidden>
             <thead>
               <tr>
-                <th>S.No.</th><th>Entry Date</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Call ID</th><th>Labour Charge</th><th>Total KM</th><th>TA Rate</th><th>Total TA</th><th>DA Type</th><th>DA Amount</th><th>Total TA + DA</th>
+                <th>S.No.</th><th>Date</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Site's Location</th><th>Total KM</th><th>TA Amt.</th><th>DA Amount</th><th>Hotel Charges</th><th>Total TA + DA</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -187,6 +197,7 @@
         </div>
       </section>
     </section>
+    <footer class="footer">Designed By - Nishant Mishra</footer>
   </main>
 
   <div id="rowModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -201,11 +212,15 @@
       <div id="modalDetails" class="detail-grid"></div>
       <div class="form-grid">
         <div>
+          <label for="siteLocationInput">Site's Location</label>
+          <input id="siteLocationInput" type="text" placeholder="Enter site location" />
+        </div>
+        <div>
           <label for="totalKmInput">Total KM *</label>
           <input id="totalKmInput" type="number" min="0" step="0.01" placeholder="Enter KM" />
         </div>
         <div>
-          <label for="totalTaInput">Total TA</label>
+          <label for="totalTaInput">TA Amt.</label>
           <input id="totalTaInput" type="text" readonly />
         </div>
         <div>
@@ -214,11 +229,16 @@
             <option value="">No DA</option>
             <option value="Half">Half</option>
             <option value="Full">Full</option>
+            <option value="Other">Other</option>
           </select>
         </div>
         <div>
           <label for="daAmountInput">DA Amount</label>
-          <input id="daAmountInput" type="text" readonly />
+          <input id="daAmountInput" type="number" min="0" step="1" readonly />
+        </div>
+        <div>
+          <label for="hotelChargesInput">Hotel Charges</label>
+          <input id="hotelChargesInput" type="number" min="0" step="1" placeholder="Optional" />
         </div>
         <div>
           <label for="totalTaDaInput">Total TA + DA</label>
@@ -238,12 +258,14 @@
     const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AjPYajbXUv9C9JJenKhs-1GyCJuBO6LstQuOjKk6rjw2ZkwajVecJgoDGmENzXJ-JQ/exec';
     const XLSX_CDN_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     const TA_RATE = 3.15;
-    const LIST_HEADERS = ['S.No.', 'Entry Date', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', 'Call ID', 'Labour Charge', 'Total KM', 'TA Rate', 'Total TA', 'DA Type', 'DA Amount', 'Total TA + DA'];
+    const LIST_HEADERS = ['S.No.', 'Date', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', "Site's Location", 'Total KM', 'TA Amt.', 'DA Amount', 'Hotel Charges', 'Total TA + DA'];
 
-    const titleEl = document.getElementById('title');
     const landingPage = document.getElementById('landingPage');
     const appPage = document.getElementById('appPage');
     const preparedByInput = document.getElementById('preparedBy');
+    const previousListNoInput = document.getElementById('previousListNo');
+    const viewPreviousListBtn = document.getElementById('viewPreviousListBtn');
+    const previousListStatus = document.getElementById('previousListStatus');
     const createListBtn = document.getElementById('createListBtn');
     const newListBtn = document.getElementById('newListBtn');
     const currentListInfo = document.getElementById('currentListInfo');
@@ -269,10 +291,12 @@
     const closeModalBtn = document.getElementById('closeModalBtn');
     const cancelModalBtn = document.getElementById('cancelModalBtn');
     const saveModalBtn = document.getElementById('saveModalBtn');
+    const siteLocationInput = document.getElementById('siteLocationInput');
     const totalKmInput = document.getElementById('totalKmInput');
     const totalTaInput = document.getElementById('totalTaInput');
     const daTypeInput = document.getElementById('daTypeInput');
     const daAmountInput = document.getElementById('daAmountInput');
+    const hotelChargesInput = document.getElementById('hotelChargesInput');
     const totalTaDaInput = document.getElementById('totalTaDaInput');
     const modalError = document.getElementById('modalError');
 
@@ -281,6 +305,7 @@
     let searchRowsCache = [];
     let currentListRows = [];
     let selectedModalRow = null;
+    let listSyncPromise = null;
     let xlsxLoadPromise = null;
 
     function setLoading(isLoading, message = 'Loading...') {
@@ -296,21 +321,13 @@
       setTimeout(() => toast.remove(), 3200);
     }
 
-    function getTodayTitle() {
-      const today = new Date();
-      const dd = String(today.getDate()).padStart(2, '0');
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const yyyy = today.getFullYear();
-      return `TA/DA List Date ${dd}-${mm}-${yyyy}`;
-    }
-
     function todayDisplay() {
       const today = new Date();
       return `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`;
     }
 
     function formatAmount(value) {
-      return Number(value || 0).toFixed(2);
+      return String(Math.round(Number(value || 0)));
     }
 
     function getScriptUrl() {
@@ -383,6 +400,15 @@
       const jsDate = new Date(text);
       if (!Number.isNaN(jsDate.getTime())) return `${String(jsDate.getDate()).padStart(2, '0')}/${String(jsDate.getMonth() + 1).padStart(2, '0')}/${jsDate.getFullYear()}`;
       return text;
+    }
+
+    function parseDisplayDateForSort(value) {
+      const parts = String(value || '').split('/').map(Number);
+      if (parts.length === 3 && parts.every(part => !Number.isNaN(part))) {
+        return new Date(parts[2], parts[1] - 1, parts[0]).getTime();
+      }
+      const parsed = new Date(value).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
     }
 
     function findHeaderRowIndex(rows2d) {
@@ -458,6 +484,7 @@
         const parsed = {
           DATE: formatDateValue(pick(row, headerMap, ['Date', 'DATE', 'Entry Date'])),
           Location: pick(row, headerMap, ['Location', 'Branch', "Site's Location", 'Target Place']),
+          "Site's Location": pick(row, headerMap, ["Site's Location", 'Site Location', 'Target Place', 'Location', 'Branch']),
           'Engineer Name': pick(row, headerMap, ['Engineer Name', 'Name']),
           'Workshop/Onsite': pick(row, headerMap, ['Workshop/Onsite', 'Workshop Onsite', 'Workshop', 'Onsite']),
           'Call Type': pick(row, headerMap, ['Call Type', 'Type of Call']),
@@ -501,7 +528,7 @@
       const localListId = createLocalList(preparedBy);
       openList(localListId, preparedBy);
       showToast(`List No. ${localListId} created. Syncing with Google Sheet...`);
-      syncCreatedList(preparedBy, localListId);
+      listSyncPromise = syncCreatedList(preparedBy, localListId);
     }
 
     function createLocalList(preparedBy) {
@@ -556,6 +583,61 @@
       machineInput.focus();
     }
 
+    function normalizeListItem(row) {
+      return {
+        ...row,
+        Date: row.Date || row['Entry Date'] || row.DATE || '',
+        "Site's Location": row["Site's Location"] || row['Site Location'] || row.Location || '',
+        'TA Amt.': row['TA Amt.'] || row['Total TA'] || '0',
+        'Hotel Charges': row['Hotel Charges'] || row['Hotel Charge'] || '0',
+        'Total TA + DA': row['Total TA + DA'] || '0'
+      };
+    }
+
+    function openExistingList(listId, preparedBy, rows) {
+      currentListId = listId;
+      currentPreparedBy = preparedBy || '';
+      currentListRows = (rows || []).map(normalizeListItem);
+      currentListInfo.textContent = `List No: ${listId} | Prepared By: ${currentPreparedBy || '-'}`;
+      landingPage.hidden = true;
+      appPage.hidden = false;
+      renderCurrentList();
+      machineInput.focus();
+    }
+
+    async function loadPreviousList() {
+      const listId = previousListNoInput.value.trim();
+      if (!listId) {
+        previousListStatus.textContent = 'Please enter a List No.';
+        previousListStatus.className = 'status error-text';
+        return;
+      }
+
+      setLoading(true, 'Loading previous list...');
+      previousListStatus.textContent = '';
+      try {
+        const data = await callAppsScriptJsonp({ action: 'getList', listId });
+        if (!data.rows || data.rows.length === 0) {
+          previousListStatus.textContent = `No rows found for List No. ${listId}.`;
+          previousListStatus.className = 'status error-text';
+          return;
+        }
+        openExistingList(listId, data.preparedBy, data.rows);
+        showToast(`List No. ${listId} loaded.`);
+      } catch (err) {
+        const localList = getListsState().lists[listId];
+        if (localList) {
+          openExistingList(listId, localList.preparedBy, localList.rows || []);
+          showToast(`Loaded local List No. ${listId}.`, 'error');
+        } else {
+          previousListStatus.textContent = `Could not load List No. ${listId}.`;
+          previousListStatus.className = 'status error-text';
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+
     async function searchRows() {
       const machineNo = machineInput.value.trim();
       if (!machineNo) {
@@ -573,7 +655,9 @@
       try {
         const res = await fetch(SHEET_CSV_URL);
         if (!res.ok) throw new Error('Could not fetch Google Sheet data.');
-        const rows = parseRows(await res.text()).filter(row => String(row['Machine No.']).trim() === machineNo);
+        const rows = parseRows(await res.text())
+          .filter(row => String(row['Machine No.']).trim() === machineNo)
+          .sort((a, b) => parseDisplayDateForSort(b.DATE) - parseDisplayDateForSort(a.DATE));
         const existing = await getExistingRows(rows.map(row => row.RowKey));
         const currentKeys = new Set(currentListRows.map(row => row.RowKey));
 
@@ -611,22 +695,22 @@
         if (row.addedToCurrent) {
           tr.className = 'added-row';
           btn.className = 'btn-added';
-          btn.textContent = '✓ Added';
+          btn.textContent = '✓';
           btn.disabled = true;
         } else if (row.existingListNo) {
           tr.className = 'duplicate-row';
           btn.className = 'btn-duplicate';
-          btn.textContent = `Added in List No. ${row.existingListNo}`;
+          btn.textContent = '✓';
           btn.disabled = true;
         } else {
           btn.className = 'btn-add';
-          btn.textContent = '+ Add';
+          btn.textContent = '+';
           btn.addEventListener('click', () => openRowModal(index));
         }
 
         actionTd.appendChild(btn);
         tr.appendChild(actionTd);
-        ['DATE', 'Location', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', 'Call ID', 'Labour Charge'].forEach(header => {
+        ['DATE', "Site's Location", 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.'].forEach(header => {
           const td = document.createElement('td');
           td.textContent = row[header] || '';
           tr.appendChild(td);
@@ -638,6 +722,12 @@
 
     function openRowModal(index) {
       selectedModalRow = searchRowsCache[index];
+      if (String(selectedModalRow['Workshop/Onsite'] || '').trim().toLowerCase() === 'workshop') {
+        window.alert('Workshop call is not eligible for TA-DA');
+        showToast('Workshop call is not eligible for TA-DA.', 'error');
+        selectedModalRow = null;
+        return;
+      }
       modalDetails.innerHTML = '';
       [
         ['Machine No.', selectedModalRow['Machine No.']],
@@ -651,8 +741,11 @@
         item.innerHTML = `<span>${label}</span>${value || '-'}`;
         modalDetails.appendChild(item);
       });
+      siteLocationInput.value = selectedModalRow["Site's Location"] || '';
       totalKmInput.value = '';
       daTypeInput.value = '';
+      daAmountInput.value = '0';
+      hotelChargesInput.value = '';
       updateModalCalculations();
       modalError.textContent = '';
       rowModal.classList.add('active');
@@ -667,19 +760,27 @@
     function getModalAmounts() {
       const km = Number(totalKmInput.value);
       const validKm = totalKmInput.value !== '' && !Number.isNaN(km) && km >= 0;
-      const totalTa = validKm ? km * TA_RATE : 0;
+      const totalTa = validKm ? Math.round(km * TA_RATE) : 0;
       const daType = daTypeInput.value;
-      const daAmount = daType === 'Half' ? 125 : daType === 'Full' ? 250 : 0;
-      return { km, validKm, totalTa, daType, daAmount, totalTaDa: totalTa + daAmount };
+      const customDa = Number(daAmountInput.value || 0);
+      const daAmount = daType === 'Half' ? 125 : daType === 'Full' ? 250 : daType === 'Other' ? Math.round(customDa) : 0;
+      const hotelChargesRaw = hotelChargesInput.value === '' ? 0 : Number(hotelChargesInput.value);
+      const validHotel = !Number.isNaN(hotelChargesRaw) && hotelChargesRaw >= 0;
+      const hotelCharges = validHotel ? Math.round(hotelChargesRaw) : 0;
+      return { km, validKm, totalTa, daType, daAmount, hotelCharges, validHotel, totalTaDa: totalTa + daAmount + hotelCharges };
     }
 
     function updateModalCalculations() {
       const amounts = getModalAmounts();
+      const isOtherDa = daTypeInput.value === 'Other';
+      daAmountInput.readOnly = !isOtherDa;
+      if (!isOtherDa) daAmountInput.value = formatAmount(amounts.daAmount);
       totalTaInput.value = formatAmount(amounts.totalTa);
-      daAmountInput.value = formatAmount(amounts.daAmount);
       totalTaDaInput.value = formatAmount(amounts.totalTaDa);
-      saveModalBtn.disabled = !amounts.validKm;
-      modalError.textContent = amounts.validKm || totalKmInput.value === '' ? '' : 'Total KM must be greater than or equal to 0.';
+      saveModalBtn.disabled = !amounts.validKm || !amounts.validHotel;
+      if (!amounts.validKm && totalKmInput.value !== '') modalError.textContent = 'Total KM must be greater than or equal to 0.';
+      else if (!amounts.validHotel) modalError.textContent = 'Hotel Charges must be greater than or equal to 0.';
+      else modalError.textContent = '';
     }
 
     async function saveModalRow() {
@@ -689,6 +790,13 @@
         modalError.textContent = 'Total KM is required and must be greater than or equal to 0.';
         return;
       }
+      if (!amounts.validHotel) {
+        modalError.textContent = 'Hotel Charges must be greater than or equal to 0.';
+        return;
+      }
+
+      setLoading(true, 'Saving row...');
+      if (listSyncPromise) await listSyncPromise.catch(() => {});
 
       const item = {
         'List No.': currentListId,
@@ -696,6 +804,7 @@
         RowKey: selectedModalRow.RowKey,
         'S.No.': currentListRows.length + 1,
         'Entry Date': selectedModalRow.DATE,
+        Date: selectedModalRow.DATE,
         'Engineer Name': selectedModalRow['Engineer Name'],
         'Call Type': selectedModalRow['Call Type'],
         Complaint: selectedModalRow.Complaint,
@@ -703,15 +812,17 @@
         'Machine No.': selectedModalRow['Machine No.'],
         'Call ID': selectedModalRow['Call ID'],
         'Labour Charge': selectedModalRow['Labour Charge'],
+        "Site's Location": siteLocationInput.value.trim(),
         'Total KM': formatAmount(amounts.km),
         'TA Rate': formatAmount(TA_RATE),
         'Total TA': formatAmount(amounts.totalTa),
+        'TA Amt.': formatAmount(amounts.totalTa),
         'DA Type': amounts.daType,
         'DA Amount': formatAmount(amounts.daAmount),
+        'Hotel Charges': formatAmount(amounts.hotelCharges),
         'Total TA + DA': formatAmount(amounts.totalTaDa)
       };
 
-      setLoading(true, 'Saving row...');
       try {
         const data = await callAppsScriptJsonp({ action: 'appendListItem', payload: JSON.stringify({ item }) });
         if (data.duplicate) throw data;
@@ -776,7 +887,7 @@
 
     function calculateTotals() {
       return currentListRows.reduce((totals, row) => {
-        totals.ta += Number(row['Total TA'] || 0);
+        totals.ta += Number(row['TA Amt.'] || row['Total TA'] || 0);
         totals.da += Number(row['DA Amount'] || 0);
         totals.grand += Number(row['Total TA + DA'] || 0);
         return totals;
@@ -791,9 +902,8 @@
     }
 
     function buildPrintableHtml() {
-      const totals = calculateTotals();
       const rowsHtml = currentListRows.map(row => `<tr>${LIST_HEADERS.map(header => `<td>${row[header] || ''}</td>`).join('')}</tr>`).join('');
-      return `<!doctype html><html><head><title>TA/DA List ${currentListId}</title><style>body{font-family:Arial,sans-serif;margin:24px;}h1{text-align:center;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #333;padding:6px;text-align:left;}th{background:#eee}.meta{margin-bottom:14px}.totals{margin-top:16px;font-weight:bold}.sign{display:flex;justify-content:space-between;margin-top:54px;}</style></head><body><h1>TA/DA List</h1><div class="meta"><div><b>List No.:</b> ${currentListId}</div><div><b>Prepared By:</b> ${currentPreparedBy}</div><div><b>Date:</b> ${todayDisplay()}</div></div><table><thead><tr>${LIST_HEADERS.map(header => `<th>${header}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><div class="totals"><div>Total TA: ${formatAmount(totals.ta)}</div><div>Total DA: ${formatAmount(totals.da)}</div><div>Grand Total TA + DA: ${formatAmount(totals.grand)}</div></div><div class="sign"><div>Prepared By: ___________</div><div>Checked By: ___________</div></div></body></html>`;
+      return `<!doctype html><html><head><title>TA-DA List No. ${currentListId}</title><style>body{font-family:Arial,sans-serif;margin:24px;}h1{text-align:center;font-size:20px;}table{border-collapse:collapse;width:100%;font-size:12px;}th,td{border:1px solid #333;padding:6px;text-align:left;}th{background:#eee}.sign{display:flex;justify-content:space-between;margin-top:54px;font-weight:bold;}</style></head><body><h1>TA-DA List No. - ${currentListId} Date : ${todayDisplay()}</h1><table><thead><tr>${LIST_HEADERS.map(header => `<th>${header}</th>`).join('')}</tr></thead><tbody>${rowsHtml}</tbody></table><div class="sign"><div>Prepared By: ${currentPreparedBy}</div><div>Posted By: ___________</div></div></body></html>`;
     }
 
     function printList() {
@@ -846,21 +956,13 @@
 
     async function downloadExcel() {
       setLoading(true, 'Preparing download...');
-      const totals = calculateTotals();
       const aoa = [
-        ['TA/DA List'],
-        ['List No.', currentListId],
-        ['Prepared By', currentPreparedBy],
-        ['Date', todayDisplay()],
+        [`TA-DA List No. - ${currentListId} Date : ${todayDisplay()}`],
         [],
         LIST_HEADERS,
         ...currentListRows.map(row => LIST_HEADERS.map(header => row[header] || '')),
         [],
-        ['Total TA', formatAmount(totals.ta)],
-        ['Total DA', formatAmount(totals.da)],
-        ['Grand Total TA + DA', formatAmount(totals.grand)],
-        [],
-        ['Prepared By:', '___________', 'Checked By:', '___________']
+        ['Prepared By:', currentPreparedBy, 'Posted By:', '___________']
       ];
 
       try {
@@ -879,8 +981,9 @@
     }
 
 
-    titleEl.textContent = getTodayTitle();
     createListBtn.addEventListener('click', createNewList);
+    viewPreviousListBtn.addEventListener('click', loadPreviousList);
+    previousListNoInput.addEventListener('keydown', event => { if (event.key === 'Enter') loadPreviousList(); });
     newListBtn.addEventListener('click', () => {
       appPage.hidden = true;
       landingPage.hidden = false;
@@ -890,6 +993,8 @@
     machineInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchRows(); });
     totalKmInput.addEventListener('input', updateModalCalculations);
     daTypeInput.addEventListener('change', updateModalCalculations);
+    daAmountInput.addEventListener('input', updateModalCalculations);
+    hotelChargesInput.addEventListener('input', updateModalCalculations);
     saveModalBtn.addEventListener('click', saveModalRow);
     closeModalBtn.addEventListener('click', closeModal);
     cancelModalBtn.addEventListener('click', closeModal);

@@ -1,24 +1,25 @@
-# TA/DA List Builder (Google Sheet)
+# TA-DA Calculation System (Google Sheet)
 
 Simple production-ready web page for two users to:
 - create a unique TA/DA List No.,
 - choose **Prepared By** without login,
+- view previous lists by List No.,
 - search Google Sheet rows by exact `Machine No.`,
-- add available rows with a `+ Add` button,
+- add available rows with a `+` button,
 - block rows already saved in any list using `DATE + Engineer Name + Machine No.` as `RowKey`,
-- enter Total KM and DA type in a modal,
-- calculate TA/DA totals automatically,
-- print or download the list to Excel.
+- enter Total KM, DA type, editable site location, and hotel charges in a modal,
+- calculate rounded TA/DA totals automatically,
+- print or download the list.
 
 ## Run
 
-Open `index.html` in a browser. The first screen shows **Prepared By** and **Create List**. After list creation, the machine-number search page opens.
+Open `index.html` in a browser. The first screen shows **Prepared By**, **Create List**, and **View Previous List**.
 
 ## Important Apps Script note
 
 The deployed Apps Script Web App URL is built into `index.html` as `DEFAULT_APPS_SCRIPT_URL`, so users do not see or enter it on the frontend.
 
-Because backend logic now checks duplicate `RowKey` values before saving, you must redeploy `apps-script/Code.gs` after changing it:
+Because backend logic checks duplicate `RowKey` values before saving, redeploy `apps-script/Code.gs` after changing it:
 
 1. Open the Google Sheet.
 2. Go to **Extensions > Apps Script**.

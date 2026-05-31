@@ -17,11 +17,14 @@ const ITEM_HEADERS = [
   'Machine No.',
   'Call ID',
   'Labour Charge',
+  "Site's Location",
   'Total KM',
   'TA Rate',
   'Total TA',
+  'TA Amt.',
   'DA Type',
   'DA Amount',
+  'Hotel Charges',
   'Total TA + DA',
 ];
 
