@@ -1,39 +1,40 @@
-# Machine No. Row Filter (Google Sheet)
+# TA/DA List Builder (Google Sheet)
 
-Simple web page that:
-- loads data from your Google Sheet (`Sheet1` / `gid=0`),
-- filters rows by exact `Machine No.`,
-- lets users create progressive list IDs and save selected rows,
-- saves selected rows into a Google Sheet tab named **Selected Rows** using the built-in Apps Script Web App URL,
-- loads selected rows by list ID,
-- exports a selected list to Excel.
+Simple production-ready web page for two users to:
+- create a unique TA/DA List No.,
+- choose **Prepared By** without login,
+- search Google Sheet rows by exact `Machine No.`,
+- add available rows with a `+ Add` button,
+- block rows already saved in any list using `DATE + Engineer Name + Machine No.` as `RowKey`,
+- enter Total KM and DA type in a modal,
+- calculate TA/DA totals automatically,
+- print or download the list to Excel.
 
 ## Run
 
-Open `index.html` in a browser. The first screen shows only **Create List**; after a list is created, the search page opens.
+Open `index.html` in a browser. The first screen shows **Prepared By** and **Create List**. After list creation, the machine-number search page opens.
 
-## Important: spreadsheet URL is not enough for saving
+## Important Apps Script note
 
-A normal Google Sheet URL like `https://docs.google.com/spreadsheets/...` can be used for reading public CSV data, but a browser page cannot write selected rows back to Google Sheets using that URL.
+The deployed Apps Script Web App URL is built into `index.html` as `DEFAULT_APPS_SCRIPT_URL`, so users do not see or enter it on the frontend.
 
-The deployed Apps Script Web App URL is now built into `index.html`, so users do not need to paste it every time. If you deploy a new Apps Script Web App later, update `DEFAULT_APPS_SCRIPT_URL` in `index.html`.
-
-## Apps Script setup / redeploying
-
-The current deployed Web App URL is already configured in the code. Use these steps only if you need to redeploy or replace it:
+Because backend logic now checks duplicate `RowKey` values before saving, you must redeploy `apps-script/Code.gs` after changing it:
 
 1. Open the Google Sheet.
 2. Go to **Extensions > Apps Script**.
 3. Paste the contents of `apps-script/Code.gs`.
-4. Click **Deploy > New deployment**.
-5. Choose **Web app**.
+4. Click **Deploy > Manage deployments**.
+5. Edit the current Web App deployment or create a new deployment.
 6. Set **Execute as** to yourself.
 7. Set **Who has access** to the users who need to save rows.
-8. Copy the Web App URL ending in `/exec`.
-9. Replace `DEFAULT_APPS_SCRIPT_URL` in `index.html` with the new deployed URL.
+8. If you create a new deployment URL, replace `DEFAULT_APPS_SCRIPT_URL` in `index.html`.
 
-The script automatically creates or reuses a tab named **Selected Rows** and appends selected rows with `List No.`.
+## Google Sheet tabs used
+
+The Apps Script creates/uses:
+- `Lists` for List No., Prepared By, and Created At.
+- `List_Items` for selected TA/DA rows and duplicate RowKey checks.
 
 ## Local fallback
 
-If the built-in Apps Script URL is removed, overridden with an invalid URL, or temporarily unavailable, the page still saves rows in the current browser's `localStorage`, but those rows will not be shared with other users or written to Google Sheets.
+If Apps Script is unavailable, the page can still add rows locally in the current browser, but those rows are not shared with the other user and are not protected by backend duplicate checks.
