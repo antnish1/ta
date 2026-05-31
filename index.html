@@ -6,8 +6,10 @@
   <title>TA/DA List Builder</title>
   <style>
     :root {
-      --bg: #f4f5f7;
+      --bg: #d7dce3;
       --card: #ffffff;
+      --section-search: #fffdf2;
+      --section-list: #f2f8ff;
       --text: #172033;
       --muted: #667085;
       --border: #d9dee8;
@@ -20,7 +22,7 @@
     }
 
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial, sans-serif; }
+    body { margin: 0; background: #d7dce3; color: var(--text); font-family: Arial, sans-serif; min-height: 100vh; }
     .page-shell { max-width: 1220px; margin: 0 auto; padding: 24px; }
     .header { margin-bottom: 22px; }
     h1, h2, h3 { margin: 0; }
@@ -32,6 +34,9 @@
     .error-text { color: var(--danger); }
 
     .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; box-shadow: 0 8px 22px rgba(15, 23, 42, 0.07); padding: 22px; margin-bottom: 18px; }
+    .landing .card { background: linear-gradient(135deg, #ffffff 0%, #fff7cc 100%); }
+    .search-card { background: var(--section-search); border-color: #f2d36b; }
+    .list-card { background: var(--section-list); border-color: #bfd7ff; }
     .landing { min-height: 58vh; display: grid; place-items: center; }
     .landing .card { width: 100%; max-width: 560px; }
     .app-page[hidden], .landing[hidden], table[hidden] { display: none; }
@@ -49,8 +54,12 @@
     .btn-primary { background: var(--accent); color: #1f2937; }
     .btn-primary:hover:not(:disabled) { background: var(--accent-dark); }
     .btn-secondary { background: #e9eef8; color: #172033; }
+    .btn-new-list { background: #1f2937; color: #fff; box-shadow: 0 4px 10px rgba(31, 41, 55, 0.22); }
+    .btn-new-list:hover:not(:disabled) { background: #111827; }
     .btn-success { background: var(--success); color: #fff; }
-    .btn-danger { background: #fee4e2; color: var(--danger); }
+    .btn-danger { background: #d92d20; color: #fff; }
+    .btn-danger:hover:not(:disabled), .btn-close:hover:not(:disabled) { background: #b42318; }
+    .btn-close { background: #fee4e2; color: var(--danger); border: 1px solid #fda29b; }
     .btn-add, .btn-added, .btn-duplicate { width: 30px; height: 30px; min-width: 30px; padding: 0; border-radius: 6px; font-size: 18px; line-height: 30px; text-align: center; }
     .btn-add { background: var(--accent); color: #172033; }
     .btn-added { background: #dcfce7; color: #166534; }
@@ -75,10 +84,10 @@
     .spinner { width: 30px; height: 30px; border: 4px solid #fff0a8; border-top-color: var(--accent-dark); border-radius: 50%; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .modal-backdrop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.55); z-index: 1000; padding: 16px; }
+    .modal-backdrop { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(15, 23, 42, 0.62); backdrop-filter: blur(3px); z-index: 1000; padding: 16px; }
     .modal-backdrop.active { display: flex; }
-    .modal { width: min(720px, 100%); max-height: 92vh; overflow-y: auto; background: #fff; border-radius: 18px; box-shadow: 0 20px 50px rgba(15, 23, 42, 0.3); padding: 22px; }
-    .modal-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+    .modal { width: min(720px, 100%); max-height: 92vh; overflow-y: auto; background: linear-gradient(135deg, #ffffff 0%, #fff9db 100%); border: 1px solid #f2d36b; border-radius: 22px; box-shadow: 0 24px 60px rgba(15, 23, 42, 0.35); padding: 24px; }
+    .modal-header { display: flex; align-items: start; justify-content: space-between; gap: 12px; margin: -24px -24px 18px; padding: 18px 22px; background: linear-gradient(90deg, #f7c600, #ffe680); border-radius: 22px 22px 0 0; }
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 18px; }
     .detail-item { background: #f8fafc; border: 1px solid var(--border); border-radius: 12px; padding: 10px; }
     .detail-item span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; margin-bottom: 4px; }
@@ -95,8 +104,13 @@
       .card { padding: 16px; }
       .toolbar { align-items: stretch; }
       .toolbar button, .toolbar .badge { width: 100%; justify-content: center; }
-      .modal-actions { flex-direction: column; }
-      .modal-actions button { width: 100%; }
+      .form-row { flex-wrap: nowrap; }
+      .form-row > div { min-width: 0 !important; }
+      #searchBtn { flex: 0 0 96px; }
+      #printBtn, #downloadBtn { flex: 1 1 0; width: auto; }
+      #searchBtn { width: auto; }
+      .modal-actions { flex-direction: row; }
+      .modal-actions button { width: auto; flex: 1; }
     }
   </style>
 </head>
@@ -143,12 +157,11 @@
     <section id="appPage" class="app-page" hidden>
       <div class="toolbar">
         <span id="currentListInfo" class="badge">No active list</span>
-        <button id="newListBtn" class="btn-secondary">Create Another List</button>
+        <button id="newListBtn" class="btn-new-list">Create Another List</button>
       </div>
 
-      <section class="card">
+      <section class="card search-card">
         <h2>Search Machine Number</h2>
-        <p class="muted">Rows already saved in any list are highlighted and cannot be added again.</p>
         <div class="form-row">
           <div style="min-width:260px; flex:1;">
             <label for="machineNo">Machine No.</label>
@@ -169,11 +182,10 @@
         </div>
       </section>
 
-      <section class="card">
+      <section class="card list-card">
         <div class="toolbar">
           <div>
             <h2>Current List</h2>
-            <p class="muted">Rows appear here immediately after adding.</p>
           </div>
           <div class="form-row">
             <button id="printBtn" class="btn-secondary" disabled>Print List</button>
@@ -208,7 +220,7 @@
           <h2 id="modalTitle">Add Row to Current List</h2>
           <p class="muted">Confirm call details and enter TA/DA information.</p>
         </div>
-        <button id="closeModalBtn" class="btn-secondary" type="button">Close</button>
+        <button id="closeModalBtn" class="btn-close" type="button">Close</button>
       </div>
       <div id="modalDetails" class="detail-grid"></div>
       <div class="form-grid">
@@ -248,7 +260,7 @@
       </div>
       <div id="modalError" class="status error-text"></div>
       <div class="modal-actions">
-        <button id="cancelModalBtn" class="btn-secondary" type="button">Cancel</button>
+        <button id="cancelModalBtn" class="btn-danger" type="button">Cancel</button>
         <button id="saveModalBtn" class="btn-primary" type="button" disabled>Save Row</button>
       </div>
     </div>
@@ -815,7 +827,7 @@
         'Labour Charge': selectedModalRow['Labour Charge'],
         "Site's Location": siteLocationInput.value.trim(),
         'Total KM': formatAmount(amounts.km),
-        'TA Rate': formatAmount(TA_RATE),
+        'TA Rate': TA_RATE.toFixed(2),
         'Total TA': formatAmount(amounts.totalTa),
         'TA Amt.': formatAmount(amounts.totalTa),
         'DA Type': amounts.daType,
