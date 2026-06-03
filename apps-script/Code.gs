@@ -26,6 +26,7 @@ const ITEM_HEADERS = [
   'DA Amount',
   'Hotel Charges',
   'Total TA + DA',
+  'Mode Of Transport',
 ];
 
 function doGet(e) {
