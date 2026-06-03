@@ -67,7 +67,7 @@
 
     .status { margin-top: 12px; min-height: 20px; }
     .table-wrap { overflow-x: auto; margin-top: 16px; border: 1px solid var(--border); border-radius: 12px; background: #fff; }
-    table { border-collapse: collapse; width: 100%; min-width: 1160px; background: #fff; }
+    table { border-collapse: collapse; width: 100%; min-width: 1240px; background: #fff; }
     th, td { border-bottom: 1px solid var(--border); border-right: 1px solid var(--border); padding: 10px; text-align: left; vertical-align: top; }
     th { background: #f8fafc; font-weight: 800; }
     tr:last-child td { border-bottom: 0; }
@@ -196,7 +196,7 @@
           <table id="currentListTable" hidden>
             <thead>
               <tr>
-                <th>S.No.</th><th>Date</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Site's Location</th><th>Total KM</th><th>TA Amt.</th><th>DA Amount</th><th>Hotel Charges</th><th>Total TA + DA</th>
+                <th>S.No.</th><th>Date</th><th>Engineer Name</th><th>Call Type</th><th>Complaint</th><th>Customer Name</th><th>Machine No.</th><th>Site's Location</th><th>Mode Of Transport</th><th>Total KM</th><th>TA Amt.</th><th>DA Amount</th><th>Hotel Charges</th><th>Total TA + DA</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -229,12 +229,20 @@
           <input id="siteLocationInput" type="text" placeholder="Enter site location" />
         </div>
         <div>
+          <label for="modeOfTransportInput">Mode Of Transport *</label>
+          <select id="modeOfTransportInput">
+            <option value="Bike">Bike</option>
+            <option value="Bus">Bus</option>
+            <option value="Train">Train</option>
+          </select>
+        </div>
+        <div>
           <label for="totalKmInput">Total KM *</label>
           <input id="totalKmInput" type="number" min="0" step="0.01" placeholder="Enter KM" />
         </div>
         <div>
           <label for="totalTaInput">TA Amt.</label>
-          <input id="totalTaInput" type="text" readonly />
+          <input id="totalTaInput" type="number" min="0" step="1" readonly />
         </div>
         <div>
           <label for="daTypeInput">DA Type</label>
@@ -271,7 +279,7 @@
     const DEFAULT_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbw2AjPYajbXUv9C9JJenKhs-1GyCJuBO6LstQuOjKk6rjw2ZkwajVecJgoDGmENzXJ-JQ/exec';
     const XLSX_CDN_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
     const TA_RATE = 3.15;
-    const LIST_HEADERS = ['S.No.', 'Date', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', "Site's Location", 'Total KM', 'TA Amt.', 'DA Amount', 'Hotel Charges', 'Total TA + DA'];
+    const LIST_HEADERS = ['S.No.', 'Date', 'Engineer Name', 'Call Type', 'Complaint', 'Customer Name', 'Machine No.', "Site's Location", 'Mode Of Transport', 'Total KM', 'TA Amt.', 'DA Amount', 'Hotel Charges', 'Total TA + DA'];
 
     const landingPage = document.getElementById('landingPage');
     const appPage = document.getElementById('appPage');
@@ -305,6 +313,7 @@
     const cancelModalBtn = document.getElementById('cancelModalBtn');
     const saveModalBtn = document.getElementById('saveModalBtn');
     const siteLocationInput = document.getElementById('siteLocationInput');
+    const modeOfTransportInput = document.getElementById('modeOfTransportInput');
     const totalKmInput = document.getElementById('totalKmInput');
     const totalTaInput = document.getElementById('totalTaInput');
     const daTypeInput = document.getElementById('daTypeInput');
@@ -601,6 +610,7 @@
         ...row,
         Date: row.Date || row['Entry Date'] || row.DATE || '',
         "Site's Location": row["Site's Location"] || row['Site Location'] || row.Location || '',
+        'Mode Of Transport': row['Mode Of Transport'] || row['Mode of Transport'] || row.Transport || '',
         'TA Amt.': row['TA Amt.'] || row['Total TA'] || '0',
         'Hotel Charges': row['Hotel Charges'] || row['Hotel Charge'] || '0',
         'Total TA + DA': row['Total TA + DA'] || '0'
@@ -755,6 +765,7 @@
         modalDetails.appendChild(item);
       });
       siteLocationInput.value = selectedModalRow["Site's Location"] || '';
+      modeOfTransportInput.value = 'Bike';
       totalKmInput.value = '';
       daTypeInput.value = '';
       daAmountInput.value = '0';
@@ -771,27 +782,33 @@
     }
 
     function getModalAmounts() {
+      const modeOfTransport = modeOfTransportInput.value;
+      const isBike = modeOfTransport === 'Bike';
       const km = Number(totalKmInput.value);
       const validKm = totalKmInput.value !== '' && !Number.isNaN(km) && km >= 0;
-      const totalTa = validKm ? Math.round(km * TA_RATE) : 0;
+      const manualTaRaw = totalTaInput.value === '' ? 0 : Number(totalTaInput.value);
+      const validManualTa = !Number.isNaN(manualTaRaw) && manualTaRaw >= 0;
+      const totalTa = isBike ? (validKm ? Math.round(km * TA_RATE) : 0) : (validManualTa ? Math.round(manualTaRaw) : 0);
       const daType = daTypeInput.value;
       const customDa = Number(daAmountInput.value || 0);
       const daAmount = daType === 'Half' ? 125 : daType === 'Full' ? 250 : daType === 'Other' ? Math.round(customDa) : 0;
       const hotelChargesRaw = hotelChargesInput.value === '' ? 0 : Number(hotelChargesInput.value);
       const validHotel = !Number.isNaN(hotelChargesRaw) && hotelChargesRaw >= 0;
       const hotelCharges = validHotel ? Math.round(hotelChargesRaw) : 0;
-      return { km, validKm, totalTa, daType, daAmount, hotelCharges, validHotel, totalTaDa: totalTa + daAmount + hotelCharges };
+      return { km, validKm, modeOfTransport, isBike, totalTa, validManualTa, daType, daAmount, hotelCharges, validHotel, totalTaDa: totalTa + daAmount + hotelCharges };
     }
 
     function updateModalCalculations() {
       const amounts = getModalAmounts();
       const isOtherDa = daTypeInput.value === 'Other';
+      totalTaInput.readOnly = amounts.isBike;
+      if (amounts.isBike) totalTaInput.value = formatAmount(amounts.totalTa);
       daAmountInput.readOnly = !isOtherDa;
       if (!isOtherDa) daAmountInput.value = formatAmount(amounts.daAmount);
-      totalTaInput.value = formatAmount(amounts.totalTa);
       totalTaDaInput.value = formatAmount(amounts.totalTaDa);
-      saveModalBtn.disabled = !amounts.validKm || !amounts.validHotel;
+      saveModalBtn.disabled = !amounts.validKm || !amounts.validManualTa || !amounts.validHotel;
       if (!amounts.validKm && totalKmInput.value !== '') modalError.textContent = 'Total KM must be greater than or equal to 0.';
+      else if (!amounts.validManualTa) modalError.textContent = 'TA Amt. must be greater than or equal to 0.';
       else if (!amounts.validHotel) modalError.textContent = 'Hotel Charges must be greater than or equal to 0.';
       else modalError.textContent = '';
     }
@@ -801,6 +818,10 @@
       const amounts = getModalAmounts();
       if (!amounts.validKm) {
         modalError.textContent = 'Total KM is required and must be greater than or equal to 0.';
+        return;
+      }
+      if (!amounts.validManualTa) {
+        modalError.textContent = 'TA Amt. must be greater than or equal to 0.';
         return;
       }
       if (!amounts.validHotel) {
@@ -826,8 +847,9 @@
         'Call ID': selectedModalRow['Call ID'],
         'Labour Charge': selectedModalRow['Labour Charge'],
         "Site's Location": siteLocationInput.value.trim(),
+        'Mode Of Transport': amounts.modeOfTransport,
         'Total KM': formatAmount(amounts.km),
-        'TA Rate': TA_RATE.toFixed(2),
+        'TA Rate': amounts.isBike ? TA_RATE.toFixed(2) : '',
         'Total TA': formatAmount(amounts.totalTa),
         'TA Amt.': formatAmount(amounts.totalTa),
         'DA Type': amounts.daType,
@@ -1004,7 +1026,9 @@
     });
     searchBtn.addEventListener('click', searchRows);
     machineInput.addEventListener('keydown', event => { if (event.key === 'Enter') searchRows(); });
+    modeOfTransportInput.addEventListener('change', updateModalCalculations);
     totalKmInput.addEventListener('input', updateModalCalculations);
+    totalTaInput.addEventListener('input', updateModalCalculations);
     daTypeInput.addEventListener('change', updateModalCalculations);
     daAmountInput.addEventListener('input', updateModalCalculations);
     hotelChargesInput.addEventListener('input', updateModalCalculations);
